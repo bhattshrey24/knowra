@@ -21,12 +21,14 @@ const LEVELS: { value: Difficulty; label: string }[] = [
 export function QuizSession({
   domainSlug,
   domainName,
+  recommendedDifficulty,
 }: {
   domainSlug: string;
   domainName: string;
+  recommendedDifficulty?: Difficulty;
 }) {
   const [status, setStatus] = useState<Status>("setup");
-  const [difficulty, setDifficulty] = useState<Difficulty>(3);
+  const [difficulty, setDifficulty] = useState<Difficulty>(recommendedDifficulty ?? 3);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number[]>>({});
@@ -107,29 +109,37 @@ export function QuizSession({
         <div>
           <p className="text-sm font-medium">Choose a difficulty</p>
           <p className="text-muted-foreground text-sm">
-            Start wherever you like. As Knowra learns your level it will recommend one — you always
-            get the final say.
+            {recommendedDifficulty
+              ? "Based on how you've done so far, Knowra suggests the highlighted level — but you always get the final say."
+              : "Start wherever you like. As Knowra learns your level it will recommend one — you always get the final say."}
           </p>
         </div>
 
         <div className="grid grid-cols-5 gap-2">
           {LEVELS.map(({ value, label }) => {
             const active = difficulty === value;
+            const recommended = recommendedDifficulty === value;
             return (
               <button
                 key={value}
                 type="button"
-                aria-label={`Difficulty ${value}: ${label}`}
+                aria-label={`Difficulty ${value}: ${label}${recommended ? " (recommended)" : ""}`}
                 aria-pressed={active}
                 disabled={status === "loading"}
                 onClick={() => setDifficulty(value)}
                 className={cn(
-                  "flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors disabled:opacity-60",
+                  "relative flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors disabled:opacity-60",
                   active
                     ? "border-primary bg-accent text-accent-foreground"
                     : "hover:border-primary/40",
+                  recommended && !active && "border-primary/50",
                 )}
               >
+                {recommended && (
+                  <span className="bg-primary text-primary-foreground absolute -top-2 rounded-full px-1.5 py-0.5 text-[9px] font-medium">
+                    Suggested
+                  </span>
+                )}
                 <span className="text-lg font-semibold">{value}</span>
                 <span className="text-muted-foreground text-[11px]">{label}</span>
               </button>
