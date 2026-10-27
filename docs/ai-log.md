@@ -5,6 +5,20 @@ Newest first.
 
 ---
 
+## 2026-10-27 — Phase 2C: flashcards
+
+**Completed** — Deterministic `buildFlashcardsFromQuiz` (unit-tested): wrong answers → **weakness**
+cards, a capped number of correct answers → **foundational** cards, each with the correct option
+text + explanation on the back. `/api/attempts` now generates and de-duplicates cards per
+user+domain on quiz finish. Flashcards page renders them in two distinct, tap-to-reveal sections.
+
+**Verified live (2A+2B)**: user took 3 quizzes → 3 attempts, 15 answers, 2 domain-mastery rows
+persisted; dashboard profile populated. Flashcards awaiting one more quiz post-2C to populate.
+
+**Next**: Phase 3 (spaced repetition / SM-2, retention, richer analytics).
+
+---
+
 ## 2026-10-27 — Phase 2 (2A+2B): persistence + knowledge profile
 
 **Completed** (branch `feat/phase-2-supabase`)

@@ -66,8 +66,10 @@ export function QuizSession({
         difficulty,
         answers: questions.map((q) => ({
           prompt: q.prompt,
+          options: q.options ?? [],
           selected: answers[q.id] ?? [],
           correctIndices: q.correctIndices ?? [],
+          explanation: q.explanation,
         })),
       }),
     }).catch(() => {});

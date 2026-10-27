@@ -5,6 +5,7 @@ import { createClient } from "@/lib/db/server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { isAnswerCorrect } from "@/lib/learning/scoring";
 import { INITIAL_MASTERY, applyOutcomes, type MasteryState } from "@/lib/learning/mastery";
+import { buildFlashcardsFromQuiz } from "@/lib/learning/flashcards";
 import type { Difficulty } from "@/types/learning";
 
 export const runtime = "nodejs";
@@ -16,8 +17,10 @@ const bodySchema = z.object({
     .array(
       z.object({
         prompt: z.string().min(1).max(1000),
+        options: z.array(z.string().min(1).max(500)).min(2).max(6),
         selected: z.array(z.number().int().nonnegative()).max(6),
         correctIndices: z.array(z.number().int().nonnegative()).min(1).max(6),
+        explanation: z.string().max(2000).optional(),
       }),
     )
     .min(1)
@@ -106,6 +109,32 @@ export async function POST(req: Request): Promise<Response> {
       },
       { onConflict: "user_id,domain_slug" },
     );
+
+    // Generate revision flashcards (weakness + foundational), de-duplicated
+    // against cards the user already has for this domain.
+    const built = buildFlashcardsFromQuiz(answers);
+    if (built.length > 0) {
+      const { data: existingCards } = await supabase
+        .from("flashcards")
+        .select("front")
+        .eq("user_id", user.id)
+        .eq("domain_slug", domain);
+      const seen = new Set((existingCards ?? []).map((c) => c.front as string));
+      const toInsert = built
+        .filter((card) => {
+          if (seen.has(card.front)) return false;
+          seen.add(card.front);
+          return true;
+        })
+        .map((card) => ({
+          user_id: user.id,
+          domain_slug: domain,
+          type: card.type,
+          front: card.front,
+          back: card.back,
+        }));
+      if (toInsert.length > 0) await supabase.from("flashcards").insert(toInsert);
+    }
 
     return NextResponse.json({ persisted: true, attemptId: attempt.id, mastery: next });
   } catch {
