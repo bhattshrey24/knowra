@@ -5,6 +5,21 @@ Newest first.
 
 ---
 
+## 2026-10-27 — Phase 4E: focus areas + gap hints (#7, #12) — Phase 4 complete
+
+**Completed** (branch `feat/phase-4e-focus`, test-first) — `focus.ts` (unit-tested): `focusAreas`
+ranks the weakest _engaged_ subjects (excludes solid/never-attempted) for lightweight 80/20
+prioritization; `needsFoundationalWork` flags low mastery with enough attempts. Dashboard gains a
+"Focus areas" card (with a Practise link per subject) and a "shore up the basics" hint on
+low-mastery subject cards. No migration. Verified: 71 tests + 7 e2e (mock) + build green.
+**Honest limitation**: subject-level approximation; true concept/prerequisite prioritization needs
+a taxonomy (future work, improve.md). **Phase 4 is complete.**
+
+**Next**: Phase 5 — cross-domain concept connections + RAG/pgvector (#10); then Phase 6 AI
+assistant (#5).
+
+---
+
 ## 2026-10-27 — Phase 4D: written questions (#11 complete)
 
 **Completed** (branch `feat/phase-4d-written`, test-first) — Free-text questions: `grade-written.ts`
