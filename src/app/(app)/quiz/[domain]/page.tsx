@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { DOMAINS } from "@/lib/domains";
-import { DifficultyPicker } from "@/components/difficulty-picker";
+import { QuizSession } from "@/components/quiz-session";
 
 export function generateStaticParams() {
   return DOMAINS.map((d) => ({ domain: d.slug }));
@@ -34,7 +34,7 @@ export default async function QuizStartPage({ params }: { params: Promise<{ doma
         <p className="text-muted-foreground mt-1 text-sm">{found.description}</p>
       </div>
 
-      <DifficultyPicker domainName={found.name} />
+      <QuizSession domainSlug={found.slug} domainName={found.name} />
     </div>
   );
 }

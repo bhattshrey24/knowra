@@ -5,6 +5,37 @@ Newest first.
 
 ---
 
+## 2026-10-27 — Phase 1: Core quiz loop
+
+**Completed** (branch `feat/phase-1-quiz-loop`, test-first)
+
+- **LLM layer:** `MockLLMProvider` (deterministic, free default), `GeminiProvider` (REST +
+  structured JSON output, injectable `fetch` so its parse/validate path is unit-tested without a
+  key), and `getLLMProvider()` which falls back to mock when no key is set.
+- **Untrusted output validation:** `parseLlmMcqs` (zod) rejects malformed/hallucinated model
+  output before it is stored or rendered. `toGeneratedQuestion` attaches system-owned fields.
+- **Deterministic engine:** `scoreQuiz` / `isAnswerCorrect` (set-equality, no partial credit).
+- **API:** `POST /api/quiz` — zod-validated body, in-memory rate limiting, mock provider by
+  default; returns generated MCQs with server-assigned ids.
+- **UI:** `QuizSession` drives difficulty 1–5 → fetch → one-question-at-a-time MCQ → score +
+  per-question feedback. Replaced the Phase 0 placeholder.
+- **Verified:** 26 unit/integration tests + 4 e2e (full quiz loop, difficulty selection) pass;
+  lint, typecheck, build green.
+
+**Decisions**
+
+- Provider returns `GeneratedQuestion`/`GeneratedFlashcard` (no `id`/`conceptId`) — identifiers are
+  the DB layer's job. Gemini flashcards/written-grading throw "Phase 2" until implemented.
+- **Known limitation:** scoring is client-side (correct indices are in the API payload). Fine for
+  the mock MVP; move server-side once attempts persist. Tracked in `improve.md`.
+
+**Next recommended action**
+
+- Open PR, confirm CI green, merge. Then Phase 2 (concept taxonomy, mastery, weakness → flashcards,
+  knowledge profile) — which is where Supabase persistence gets wired in.
+
+---
+
 ## 2026-10-27 — Phase 0: Foundation
 
 **Completed**

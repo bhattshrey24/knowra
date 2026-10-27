@@ -12,6 +12,13 @@
 
 import type { Concept, Difficulty, Flashcard, Question, QuestionFormat } from "@/types/learning";
 
+/**
+ * Content a provider returns, before the system assigns identifiers. `id` and
+ * `conceptId` are owned by our database layer, not the model.
+ */
+export type GeneratedQuestion = Omit<Question, "id" | "conceptId">;
+export type GeneratedFlashcard = Omit<Flashcard, "id" | "conceptId">;
+
 export interface GenerateQuestionsInput {
   conceptName: string;
   topicName: string;
@@ -56,8 +63,8 @@ export interface GradeWrittenResult {
  */
 export interface LLMProvider {
   readonly id: string;
-  generateQuestions(input: GenerateQuestionsInput): Promise<Question[]>;
-  generateFlashcards(input: GenerateFlashcardsInput): Promise<Flashcard[]>;
+  generateQuestions(input: GenerateQuestionsInput): Promise<GeneratedQuestion[]>;
+  generateFlashcards(input: GenerateFlashcardsInput): Promise<GeneratedFlashcard[]>;
   explain(input: ExplainInput): Promise<string>;
   gradeWritten(input: GradeWrittenInput): Promise<GradeWrittenResult>;
 }
