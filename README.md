@@ -51,5 +51,10 @@ tests/              unit · integration · e2e
 .claude/            agents, hooks, settings (Claude Code setup)
 ```
 
+## Deployment
+
+Hosted on Vercel via native Git integration: `prod` → Production, `dev` and feature branches →
+Preview. Full setup and env vars in [docs/deployment.md](docs/deployment.md).
+
 See `CLAUDE.md` (conventions), `FEATURES.md` (feature status), `docs/design.md` (design),
-`docs/ai-log.md` (decisions), and `improve.md` (tech debt).
+`docs/ai-log.md` (decisions), `docs/deployment.md` (deploy), and `improve.md` (tech debt).
