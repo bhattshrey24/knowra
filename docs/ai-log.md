@@ -16,8 +16,9 @@ when the learner missed something and has a known subject to anchor to. Flashcar
 
 **Blocked on user**: apply `supabase/migrations/0006_connection_flashcards.sql`.
 
-**Next (needs a decision)**: 5B — RAG/pgvector semantic retrieval. The one cost-touching area
-(embeddings); options to be proposed before building.
+**5B decision**: RAG/pgvector **deferred** (user's call) — small corpus + embeddings cost; #10 is
+delivered via 5A. Design captured in `improve.md` ("Designed, deferred"). Next: Phase 6 (AI
+assistant, #5).
 
 ---
 

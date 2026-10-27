@@ -3,6 +3,20 @@
 Prioritized by impact × risk. Not a feature backlog (that's `FEATURES.md`) — this is engineering
 quality, debt, and upgrades.
 
+## Designed, deferred
+
+- **RAG / pgvector semantic retrieval (Phase 5B, #10 enhancement).** Deferred deliberately: the
+  cross-domain feature (#10) already ships via deterministic analogy anchors, the content corpus is
+  small, and good embeddings need an API key / cost — the original plan said "start with SQL, add
+  vectors where they earn it." **Design when revisited:** enable the `pgvector` extension
+  (migration); add an `embedding vector(768)` column to `flashcards` (and/or a `concepts` table);
+  embed on write behind the LLM-provider abstraction — `EmbeddingProvider` with a Gemini
+  `text-embedding-004` implementation (free tier) and a deterministic keyword-hash fallback for
+  $0/offline; expose `relatedTo(text, k)` via a pgvector cosine-distance query (`<=>`) guarded by
+  RLS; use it to (a) target better analogy anchors, (b) dedupe near-identical questions, (c)
+  retrieve context for the Phase 6 assistant. Keep it behind `isEmbeddingsConfigured()` so the app
+  stays fully functional without it.
+
 ## High impact
 
 - **Server-side quiz scoring.** Phase 1 returns correct indices in the `/api/quiz` payload and
