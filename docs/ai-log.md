@@ -5,6 +5,17 @@ Newest first.
 
 ---
 
+## 2026-10-27 — Deployment setup (Vercel)
+
+Added `dev` and `prod` branches alongside `main` (user's chosen model). CI now runs on all three
+plus PRs to them. Wrote `docs/deployment.md`: Vercel native Git integration with Production
+Branch = `prod` (→ Production) and every other branch → Preview; env-var checklist; Supabase
+site-URL + free-tier-pause + Hobby/non-commercial notes. **Vercel connection itself is the user's
+to do in the dashboard** (needs their account); no deploy job added to GitHub Actions — Vercel's
+Git integration handles deploys.
+
+---
+
 ## 2026-10-27 — Phase 4E: focus areas + gap hints (#7, #12) — Phase 4 complete
 
 **Completed** (branch `feat/phase-4e-focus`, test-first) — `focus.ts` (unit-tested): `focusAreas`
