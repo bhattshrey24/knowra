@@ -1,0 +1,63 @@
+/**
+ * Provider-agnostic LLM abstraction.
+ *
+ * The product keeps its knowledge profile and learning engine independent of
+ * the LLM provider. Any provider (the free default, or a user-supplied
+ * Anthropic / OpenAI key later) implements this interface. Callers depend only
+ * on `LLMProvider`, never on a concrete SDK.
+ *
+ * Implementations are added in Phase 1 (default: Google Gemini Flash free tier).
+ * Each method receives only the minimal context required for its task.
+ */
+
+import type { Concept, Difficulty, Flashcard, Question, QuestionFormat } from "@/types/learning";
+
+export interface GenerateQuestionsInput {
+  conceptName: string;
+  topicName: string;
+  domainName: string;
+  difficulty: Difficulty;
+  formats: QuestionFormat[];
+  count: number;
+  /** Concepts the user already knows, for cross-domain analogies (#10). */
+  knownConcepts?: string[];
+  /** Avoid regenerating near-duplicates of these prompts. */
+  avoidPrompts?: string[];
+}
+
+export interface GenerateFlashcardsInput {
+  concept: Pick<Concept, "name">;
+  type: Flashcard["type"];
+  /** Optional familiar concept to anchor a cross-domain analogy. */
+  analogyAnchor?: string;
+}
+
+export interface ExplainInput {
+  question: Question;
+  userAnswer: string;
+  isCorrect: boolean;
+}
+
+export interface GradeWrittenInput {
+  question: Question;
+  userAnswer: string;
+}
+
+export interface GradeWrittenResult {
+  /** 0..1 score from the model; the deterministic engine owns mastery updates. */
+  score: number;
+  feedback: string;
+}
+
+/**
+ * The contract every LLM backend implements. Returned content is always
+ * schema-validated by the caller (zod) before it is stored or rendered —
+ * model output is treated as untrusted input.
+ */
+export interface LLMProvider {
+  readonly id: string;
+  generateQuestions(input: GenerateQuestionsInput): Promise<Question[]>;
+  generateFlashcards(input: GenerateFlashcardsInput): Promise<Flashcard[]>;
+  explain(input: ExplainInput): Promise<string>;
+  gradeWritten(input: GradeWrittenInput): Promise<GradeWrittenResult>;
+}

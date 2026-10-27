@@ -1,0 +1,55 @@
+# Knowra
+
+**Learn by testing yourself.** Knowra is a mobile-first PWA that quizzes you across any subject,
+finds your weak concepts, and schedules spaced revision so knowledge sticks. It applies three
+evidence-informed principles: **active recall**, **80/20 prioritization**, and **spaced
+repetition**.
+
+> Hackathon prototype. Kept free-tier where possible; see `docs/ai-log.md` for decisions.
+
+## Stack
+
+- **Next.js 15** (App Router, TypeScript) · **React 19** · **Tailwind v4** · **shadcn/ui**
+- **Supabase** (Postgres + Auth + pgvector) with Row Level Security
+- **Provider-agnostic LLM** layer (free Gemini Flash by default; bring your own key later)
+- **Vitest** (unit/integration) + **Playwright** (e2e) · **GitHub Actions** CI · **Vercel** hosting
+
+The deterministic **learning engine** (`src/lib/learning`) owns all scoring, mastery, and
+scheduling and is independent of any LLM provider. LLMs only generate content behind the
+`LLMProvider` interface (`src/lib/llm/provider.ts`).
+
+## Getting started
+
+```bash
+pnpm install
+cp .env.example .env.local   # fill in Supabase + LLM keys (never commit .env.local)
+pnpm dev                     # http://localhost:3000
+```
+
+## Scripts
+
+| Command                             | Purpose                                         |
+| ----------------------------------- | ----------------------------------------------- |
+| `pnpm dev`                          | Dev server (Turbopack)                          |
+| `pnpm build` / `pnpm start`         | Production build / serve                        |
+| `pnpm lint` · `pnpm typecheck`      | ESLint · `tsc --noEmit`                         |
+| `pnpm test` · `pnpm test:e2e`       | Vitest · Playwright                             |
+| `pnpm format` · `pnpm format:check` | Prettier                                        |
+| `pnpm check`                        | lint + typecheck + test + build (the full gate) |
+
+## Project layout
+
+```
+src/app            routes, PWA manifest, server handlers
+src/components      app UI (+ ui/ = generated shadcn primitives)
+src/lib/learning    deterministic learning engine (no LLM)
+src/lib/llm         provider-agnostic LLM abstraction
+src/lib/db          Supabase data access
+src/types           shared domain types
+supabase/migrations versioned SQL + RLS
+tests/              unit · integration · e2e
+.claude/            agents, hooks, settings (Claude Code setup)
+```
+
+See `CLAUDE.md` (conventions), `FEATURES.md` (feature status), `docs/design.md` (design),
+`docs/ai-log.md` (decisions), and `improve.md` (tech debt).
