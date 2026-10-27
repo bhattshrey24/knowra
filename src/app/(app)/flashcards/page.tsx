@@ -106,6 +106,7 @@ export default async function FlashcardsPage() {
 
   const weakness = cards.filter((c) => c.type === "weakness");
   const foundational = cards.filter((c) => c.type === "foundational");
+  const connections = cards.filter((c) => c.type === "connection");
 
   const now = Date.now();
   const dueCards: DueCard[] = cards
@@ -156,6 +157,16 @@ export default async function FlashcardsPage() {
           description="Core concepts worth keeping sharp, including ones you already know."
           badge={<Badge variant="secondary">Foundational</Badge>}
           cards={foundational}
+          titles={titles}
+        />
+      )}
+
+      {connections.length > 0 && (
+        <Section
+          title="Connections"
+          description="Analogies linking a tricky concept to a subject you already know well."
+          badge={<Badge>Cross-domain</Badge>}
+          cards={connections}
           titles={titles}
         />
       )}

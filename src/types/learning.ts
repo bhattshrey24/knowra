@@ -63,8 +63,11 @@ export interface Question {
   explanation?: string;
 }
 
-/** Distinguishes revision cards targeting weaknesses from foundational ones (#4). */
-export type FlashcardType = "weakness" | "foundational";
+/**
+ * Revision-card kinds: weakness-targeting, foundational, or a cross-domain
+ * connection/analogy linking a concept to one the learner already knows (#10).
+ */
+export type FlashcardType = "weakness" | "foundational" | "connection";
 
 export interface Flashcard {
   id: string;
