@@ -57,24 +57,32 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
   subjects — and foundational-gap hints (#12) — "shore up the basics" nudge on low-mastery subjects.
   Full concept/prerequisite graph is future work (improve.md).
 
+## Phase 5 — Cross-domain connections ✅
+
+- ✅ 5A: Cross-domain analogy flashcards (#10) — deterministic anchor picker (`connections.ts`,
+  unit-tested) chooses a subject you already know well; the LLM writes an analogy linking your
+  weak concept to it. New `connection` flashcard type + section (migration `0006`).
+- ⏸️ 5B: RAG / pgvector semantic retrieval — **deliberately deferred** (small corpus, embeddings
+  cost); #10 is delivered via 5A. Design documented in `improve.md`.
+
 ## MVP features (sequenced across phases; none removed)
 
-| #   | Feature                               | Phase | Status | Notes                                                                                     |
-| --- | ------------------------------------- | ----- | ------ | ----------------------------------------------------------------------------------------- |
-| 1   | Predefined domains homepage           | 1 / 2 | ✅     | Home → select domain → real generated quiz; attempts persisted (anon auth + Supabase).    |
-| 2   | Custom topic search                   | 4     | 🟨     | Quiz any typed topic; rolls up as its own subject. Verify live after `0004`.              |
-| 3   | Adjustable difficulty 1–5 + recommend | 1 / 4 | ✅     | Select 1–5; system suggests a level from mastery (user overrides).                        |
-| 4   | Weakness detection + flashcards       | 2     | 🟨     | Weakness (wrong) + foundational (right) cards, distinctly tagged; verify live via a quiz. |
-| 5   | AI learning assistant (chatbot)       | 6     | ⬜     | Optional; scoped to user's profile/mistakes.                                              |
-| 6   | Spaced repetition + reminders         | 3     | 🟨     | SM-2 review flow reschedules cards; verify live after `0003`. Reminders later.            |
-| 7   | 80/20 prioritization                  | 4     | 🟨     | Dashboard focus areas rank weakest subjects; concept-level prioritization later.          |
-| 8   | Holistic knowledge profile            | 2     | 🟨     | Per-domain mastery (X/10) on dashboard; verify live after migration + anon auth.          |
-| 9   | Progress dashboard & analytics        | 3     | ✅     | Stat tiles, accuracy-over-time chart, per-domain mastery + learning gains.                |
-| 10  | Cross-domain concept connections      | 5     | ⬜     | Analogy cards linking new concepts to familiar ones.                                      |
-| 11  | Multiple question formats             | 1 / 4 | ✅     | MCQ + multi-select + written (free-text, graded). Format picker on the quiz screen.       |
-| 12  | Foundational gap detection            | 4     | 🟨     | Low-mastery "shore up the basics" hints; prerequisite-graph detection later.              |
-| 13  | Baseline + long-term measurement      | 3     | 🟨     | Baseline→now gain per domain shown; richer retention (new Qs over time) later.            |
-| 14  | Progressive load management           | 4     | 🟨     | Recommended difficulty rises gradually with mastery/confidence; more to come.             |
+| #   | Feature                               | Phase | Status | Notes                                                                                         |
+| --- | ------------------------------------- | ----- | ------ | --------------------------------------------------------------------------------------------- |
+| 1   | Predefined domains homepage           | 1 / 2 | ✅     | Home → select domain → real generated quiz; attempts persisted (anon auth + Supabase).        |
+| 2   | Custom topic search                   | 4     | 🟨     | Quiz any typed topic; rolls up as its own subject. Verify live after `0004`.                  |
+| 3   | Adjustable difficulty 1–5 + recommend | 1 / 4 | ✅     | Select 1–5; system suggests a level from mastery (user overrides).                            |
+| 4   | Weakness detection + flashcards       | 2     | 🟨     | Weakness (wrong) + foundational (right) cards, distinctly tagged; verify live via a quiz.     |
+| 5   | AI learning assistant (chatbot)       | 6     | ⬜     | Optional; scoped to user's profile/mistakes.                                                  |
+| 6   | Spaced repetition + reminders         | 3     | 🟨     | SM-2 review flow reschedules cards; verify live after `0003`. Reminders later.                |
+| 7   | 80/20 prioritization                  | 4     | 🟨     | Dashboard focus areas rank weakest subjects; concept-level prioritization later.              |
+| 8   | Holistic knowledge profile            | 2     | 🟨     | Per-domain mastery (X/10) on dashboard; verify live after migration + anon auth.              |
+| 9   | Progress dashboard & analytics        | 3     | ✅     | Stat tiles, accuracy-over-time chart, per-domain mastery + learning gains.                    |
+| 10  | Cross-domain concept connections      | 5     | ✅     | Analogy flashcards link weak concepts to a known subject. Semantic RAG deferred (improve.md). |
+| 11  | Multiple question formats             | 1 / 4 | ✅     | MCQ + multi-select + written (free-text, graded). Format picker on the quiz screen.           |
+| 12  | Foundational gap detection            | 4     | 🟨     | Low-mastery "shore up the basics" hints; prerequisite-graph detection later.                  |
+| 13  | Baseline + long-term measurement      | 3     | 🟨     | Baseline→now gain per domain shown; richer retention (new Qs over time) later.                |
+| 14  | Progressive load management           | 4     | 🟨     | Recommended difficulty rises gradually with mastery/confidence; more to come.                 |
 
 ## Outstanding / blocked
 

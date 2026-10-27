@@ -61,6 +61,15 @@ export class MockLLMProvider implements LLMProvider {
   }
 
   async generateFlashcards(input: GenerateFlashcardsInput): Promise<GeneratedFlashcard[]> {
+    if (input.type === "connection" && input.analogyAnchor) {
+      return [
+        {
+          type: "connection",
+          front: `How is "${input.concept.name}" like ${input.analogyAnchor}?`,
+          back: `Just as you understand ${input.analogyAnchor}, "${input.concept.name}" follows a similar pattern — a mock cross-domain analogy linking the two.`,
+        },
+      ];
+    }
     return [
       {
         type: input.type,

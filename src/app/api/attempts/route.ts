@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/db/server";
-import { resolveLearnable } from "@/lib/db/learnable-server";
+import { resolveLearnable, customTitleMap } from "@/lib/db/learnable-server";
 import { isSupabaseConfigured } from "@/lib/env";
+import { getLLMProvider } from "@/lib/llm";
+import { predefinedLearnable } from "@/lib/learnable";
 import { isAnswerCorrect } from "@/lib/learning/scoring";
 import { gradeWritten, isWrittenCorrect } from "@/lib/learning/grade-written";
 import { INITIAL_MASTERY, applyOutcomes, type MasteryState } from "@/lib/learning/mastery";
 import { buildFlashcardsFromQuiz } from "@/lib/learning/flashcards";
+import { pickAnalogyAnchor } from "@/lib/learning/connections";
 import type { Difficulty } from "@/types/learning";
 
 export const runtime = "nodejs";
@@ -145,6 +148,54 @@ export async function POST(req: Request): Promise<Response> {
           back: card.back,
         }));
       if (toInsert.length > 0) await supabase.from("flashcards").insert(toInsert);
+    }
+
+    // Cross-domain connection card (#10): if the learner slipped here and has a
+    // subject they already know well, generate an analogy linking the two.
+    if (outcomes.some((o) => !o.correct)) {
+      const { data: masteryRows } = await supabase
+        .from("domain_mastery")
+        .select("domain_slug,mastery,attempts")
+        .eq("user_id", user.id);
+      const anchorSlug = pickAnalogyAnchor(
+        domain,
+        (masteryRows ?? []).map((m) => ({
+          slug: m.domain_slug as string,
+          mastery: m.mastery as number,
+          attempts: m.attempts as number,
+        })),
+      );
+      if (anchorSlug) {
+        const anchorName =
+          predefinedLearnable(anchorSlug)?.name ??
+          (await customTitleMap()).get(anchorSlug) ??
+          anchorSlug;
+        try {
+          const cards = await getLLMProvider().generateFlashcards({
+            concept: { name: learnable.name },
+            type: "connection",
+            analogyAnchor: anchorName,
+          });
+          const { data: existing } = await supabase
+            .from("flashcards")
+            .select("front")
+            .eq("user_id", user.id)
+            .eq("domain_slug", domain);
+          const seen = new Set((existing ?? []).map((c) => c.front as string));
+          const toInsert = cards
+            .filter((c) => !seen.has(c.front))
+            .map((c) => ({
+              user_id: user.id,
+              domain_slug: domain,
+              type: c.type,
+              front: c.front,
+              back: c.back,
+            }));
+          if (toInsert.length > 0) await supabase.from("flashcards").insert(toInsert);
+        } catch {
+          // best-effort: a connection card is a bonus, never fails the attempt
+        }
+      }
     }
 
     return NextResponse.json({ persisted: true, attemptId: attempt.id, mastery: next });

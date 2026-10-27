@@ -5,6 +5,23 @@ Newest first.
 
 ---
 
+## 2026-10-27 — Phase 5A: cross-domain analogy flashcards (#10)
+
+**Completed** (branch `feat/phase-5a-connections`, test-first) — `connections.ts` (unit-tested):
+`pickAnalogyAnchor` deterministically chooses the learner's strongest _other_ well-practised
+subject. New `connection` flashcard type (migration `0006` widens the type check). Mock + the
+`LLMProvider` generate an analogy card; `/api/attempts` creates one (best-effort, de-duplicated)
+when the learner missed something and has a known subject to anchor to. Flashcards page gains a
+"Connections" section. Verified: 75 tests + 7 e2e (mock) + build green.
+
+**Blocked on user**: apply `supabase/migrations/0006_connection_flashcards.sql`.
+
+**5B decision**: RAG/pgvector **deferred** (user's call) — small corpus + embeddings cost; #10 is
+delivered via 5A. Design captured in `improve.md` ("Designed, deferred"). Next: Phase 6 (AI
+assistant, #5).
+
+---
+
 ## 2026-10-27 — Deployment setup (Vercel)
 
 Added a `dev` branch alongside `main`. **`main` is the production branch** (user's model); `dev`
