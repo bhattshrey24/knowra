@@ -16,7 +16,12 @@ import type {
   GradeWrittenResult,
   LLMProvider,
 } from "@/lib/llm/provider";
-import { parseLlmMcqs, toGeneratedQuestion } from "@/lib/validation/question";
+import {
+  parseLlmMcqs,
+  parseLlmMulti,
+  toGeneratedMultiQuestion,
+  toGeneratedQuestion,
+} from "@/lib/validation/question";
 
 type FetchFn = typeof fetch;
 
@@ -34,6 +39,20 @@ const MCQ_RESPONSE_SCHEMA = {
   },
 } as const;
 
+const MULTI_RESPONSE_SCHEMA = {
+  type: "ARRAY",
+  items: {
+    type: "OBJECT",
+    properties: {
+      prompt: { type: "STRING" },
+      options: { type: "ARRAY", items: { type: "STRING" } },
+      correctIndices: { type: "ARRAY", items: { type: "INTEGER" } },
+      explanation: { type: "STRING" },
+    },
+    required: ["prompt", "options", "correctIndices", "explanation"],
+  },
+} as const;
+
 export class GeminiProvider implements LLMProvider {
   readonly id = "gemini";
 
@@ -44,23 +63,24 @@ export class GeminiProvider implements LLMProvider {
   ) {}
 
   async generateQuestions(input: GenerateQuestionsInput): Promise<GeneratedQuestion[]> {
-    const prompt = [
-      `Generate ${input.count} multiple-choice questions to quiz a learner on the concept`,
-      `"${input.conceptName}" (topic: ${input.topicName}, subject: ${input.domainName}).`,
-      `Target difficulty: ${input.difficulty} on a 1-5 scale (1 easiest, 5 hardest).`,
-      `Each question has exactly 4 options and one correct answer. Keep prompts focused and clear.`,
-      input.avoidPrompts?.length
-        ? `Avoid repeating these prompts: ${input.avoidPrompts.join(" | ")}.`
-        : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
+    const format = input.formats[0] ?? "mcq";
+    const context = `"${input.conceptName}" (topic: ${input.topicName}, subject: ${input.domainName}) at difficulty ${input.difficulty}/5`;
+    const avoid = input.avoidPrompts?.length
+      ? ` Avoid repeating: ${input.avoidPrompts.join(" | ")}.`
+      : "";
 
+    if (format === "multi") {
+      const prompt = `Generate ${input.count} multiple-select questions on ${context}. Each has 4 options and one OR MORE correct answers (correctIndices).${avoid}`;
+      const raw = await this.generateJson(prompt, MULTI_RESPONSE_SCHEMA);
+      const parsed = parseLlmMulti(raw);
+      if (!parsed.success) throw new Error(`Gemini returned invalid multi output: ${parsed.error}`);
+      return parsed.data.map((m) => toGeneratedMultiQuestion(m, input.difficulty));
+    }
+
+    const prompt = `Generate ${input.count} multiple-choice questions on ${context}. Each has exactly 4 options and one correct answer.${avoid}`;
     const raw = await this.generateJson(prompt, MCQ_RESPONSE_SCHEMA);
     const parsed = parseLlmMcqs(raw);
-    if (!parsed.success) {
-      throw new Error(`Gemini returned invalid MCQ output: ${parsed.error}`);
-    }
+    if (!parsed.success) throw new Error(`Gemini returned invalid MCQ output: ${parsed.error}`);
     return parsed.data.map((mcq) => toGeneratedQuestion(mcq, input.difficulty));
   }
 

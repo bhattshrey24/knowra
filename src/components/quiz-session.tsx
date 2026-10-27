@@ -9,6 +9,7 @@ import { scoreQuiz, type QuizSummary } from "@/lib/learning/scoring";
 import type { Difficulty, Question } from "@/types/learning";
 
 type Status = "setup" | "loading" | "active" | "error" | "results";
+type QuizFormat = "mcq" | "multi";
 
 const LEVELS: { value: Difficulty; label: string }[] = [
   { value: 1, label: "Beginner" },
@@ -16,6 +17,11 @@ const LEVELS: { value: Difficulty; label: string }[] = [
   { value: 3, label: "Medium" },
   { value: 4, label: "Hard" },
   { value: 5, label: "Expert" },
+];
+
+const FORMATS: { value: QuizFormat; label: string; hint: string }[] = [
+  { value: "mcq", label: "Multiple choice", hint: "One correct answer" },
+  { value: "multi", label: "Multiple select", hint: "One or more correct" },
 ];
 
 export function QuizSession({
@@ -29,6 +35,7 @@ export function QuizSession({
 }) {
   const [status, setStatus] = useState<Status>("setup");
   const [difficulty, setDifficulty] = useState<Difficulty>(recommendedDifficulty ?? 3);
+  const [format, setFormat] = useState<QuizFormat>("mcq");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number[]>>({});
@@ -40,7 +47,7 @@ export function QuizSession({
       const res = await fetch("/api/quiz", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ domain: domainSlug, difficulty, count: 5 }),
+        body: JSON.stringify({ domain: domainSlug, difficulty, count: 5, format }),
       });
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       const data = (await res.json()) as { questions: Question[] };
@@ -55,7 +62,15 @@ export function QuizSession({
   }
 
   function select(questionId: string, index: number) {
-    setAnswers((prev) => ({ ...prev, [questionId]: [index] }));
+    const isMulti = questions.find((q) => q.id === questionId)?.format === "multi";
+    setAnswers((prev) => {
+      if (!isMulti) return { ...prev, [questionId]: [index] };
+      const curr = prev[questionId] ?? [];
+      const next = curr.includes(index)
+        ? curr.filter((i) => i !== index)
+        : [...curr, index].sort((a, b) => a - b);
+      return { ...prev, [questionId]: next };
+    });
   }
 
   function persistAttempt() {
@@ -147,6 +162,33 @@ export function QuizSession({
           })}
         </div>
 
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Question format</p>
+          <div className="grid grid-cols-2 gap-2">
+            {FORMATS.map(({ value, label, hint }) => {
+              const active = format === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={active}
+                  disabled={status === "loading"}
+                  onClick={() => setFormat(value)}
+                  className={cn(
+                    "rounded-lg border p-3 text-left transition-colors disabled:opacity-60",
+                    active
+                      ? "border-primary bg-accent text-accent-foreground"
+                      : "hover:border-primary/40",
+                  )}
+                >
+                  <div className="text-sm font-medium">{label}</div>
+                  <div className="text-muted-foreground text-xs">{hint}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {status === "error" && (
           <p role="alert" className="text-destructive text-sm">
             Something went wrong generating your quiz. Please try again.
@@ -182,7 +224,14 @@ export function QuizSession({
           {questions.map((q) => {
             const result = summary.results.find((r) => r.questionId === q.id);
             const correct = result?.correct ?? false;
-            const chosen = result?.selected[0];
+            const chosenText = (result?.selected ?? [])
+              .map((i) => q.options?.[i])
+              .filter(Boolean)
+              .join(", ");
+            const correctText = (q.correctIndices ?? [])
+              .map((i) => q.options?.[i])
+              .filter(Boolean)
+              .join(", ");
             return (
               <li key={q.id} className="rounded-lg border p-4">
                 <div className="flex items-start gap-2">
@@ -197,14 +246,12 @@ export function QuizSession({
                   </span>
                   <div className="space-y-1">
                     <p className="text-sm font-medium">{q.prompt}</p>
-                    {!correct && chosen !== undefined && q.options && (
-                      <p className="text-muted-foreground text-sm">
-                        You chose: {q.options[chosen]}
-                      </p>
+                    {!correct && chosenText && (
+                      <p className="text-muted-foreground text-sm">You chose: {chosenText}</p>
                     )}
-                    {q.options && q.correctIndices && (
+                    {correctText && (
                       <p className="text-sm text-emerald-700 dark:text-emerald-400">
-                        Correct: {q.options[q.correctIndices[0]]}
+                        Correct: {correctText}
                       </p>
                     )}
                     {q.explanation && (
@@ -227,8 +274,9 @@ export function QuizSession({
 
   // status === "active"
   const question = questions[current];
-  const selected = answers[question.id]?.[0];
-  const answered = selected !== undefined;
+  const selectedIndices = answers[question.id] ?? [];
+  const answered = selectedIndices.length > 0;
+  const isMulti = question.format === "multi";
   const isLast = current === questions.length - 1;
 
   return (
@@ -245,11 +293,19 @@ export function QuizSession({
         <Progress value={((current + 1) / questions.length) * 100} />
       </div>
 
-      <h2 className="text-lg font-medium">{question.prompt}</h2>
+      <div>
+        <h2 className="text-lg font-medium">{question.prompt}</h2>
+        {isMulti && <p className="text-muted-foreground mt-1 text-xs">Select all that apply.</p>}
+      </div>
 
-      <div className="grid gap-2" role="listbox" aria-label="Answer options">
+      <div
+        className="grid gap-2"
+        role="listbox"
+        aria-multiselectable={isMulti}
+        aria-label="Answer options"
+      >
         {question.options?.map((option, index) => {
-          const active = selected === index;
+          const active = selectedIndices.includes(index);
           return (
             <button
               key={index}
@@ -258,12 +314,22 @@ export function QuizSession({
               aria-selected={active}
               onClick={() => select(question.id, index)}
               className={cn(
-                "rounded-lg border p-3 text-left text-sm transition-colors",
+                "flex items-center gap-3 rounded-lg border p-3 text-left text-sm transition-colors",
                 active
                   ? "border-primary bg-accent text-accent-foreground"
                   : "hover:border-primary/40",
               )}
             >
+              <span
+                className={cn(
+                  "flex size-4 shrink-0 items-center justify-center border",
+                  isMulti ? "rounded-sm" : "rounded-full",
+                  active ? "border-primary bg-primary text-primary-foreground" : "border-input",
+                )}
+                aria-hidden
+              >
+                {active && <Check className="size-3" />}
+              </span>
               {option}
             </button>
           );

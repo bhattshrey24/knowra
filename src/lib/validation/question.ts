@@ -50,3 +50,49 @@ export function toGeneratedQuestion(mcq: LlmMcq, difficulty: Difficulty): Genera
     explanation: mcq.explanation,
   };
 }
+
+/** Multiple-select: one or more correct options, all in range and distinct. */
+export const llmMultiSchema = z
+  .object({
+    prompt: z.string().min(1).max(1000),
+    options: z.array(z.string().min(1).max(500)).min(2).max(6),
+    correctIndices: z.array(z.number().int().nonnegative()).min(1).max(6),
+    explanation: z.string().min(1).max(2000),
+  })
+  .refine((q) => q.correctIndices.every((i) => i < q.options.length), {
+    message: "a correctIndex is outside the options range",
+    path: ["correctIndices"],
+  })
+  .refine((q) => new Set(q.correctIndices).size === q.correctIndices.length, {
+    message: "correctIndices must be distinct",
+    path: ["correctIndices"],
+  });
+
+export type LlmMulti = z.infer<typeof llmMultiSchema>;
+
+export const llmMultiListSchema = z.array(llmMultiSchema).min(1).max(20);
+
+export function parseLlmMulti(raw: unknown): ParseResult<LlmMulti[]> {
+  const result = llmMultiListSchema.safeParse(raw);
+  if (result.success) return { success: true, data: result.data };
+  return {
+    success: false,
+    error: result.error.issues
+      .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+      .join("; "),
+  };
+}
+
+export function toGeneratedMultiQuestion(
+  multi: LlmMulti,
+  difficulty: Difficulty,
+): GeneratedQuestion {
+  return {
+    difficulty,
+    format: "multi",
+    prompt: multi.prompt,
+    options: multi.options,
+    correctIndices: [...multi.correctIndices].sort((a, b) => a - b),
+    explanation: multi.explanation,
+  };
+}
