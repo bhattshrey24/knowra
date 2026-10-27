@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { BarChart3, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowRight, BarChart3, Target, TrendingDown, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { EmptyState } from "@/components/empty-state";
@@ -10,12 +11,19 @@ import { createClient } from "@/lib/db/server";
 import { customTitleMap } from "@/lib/db/learnable-server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { masteryOutOfTen, type MasteryState } from "@/lib/learning/mastery";
+import { focusAreas, needsFoundationalWork, type FocusReason } from "@/lib/learning/focus";
 import {
   accuracyTimeline,
   domainGains,
   overallStats,
   type AttemptLike,
 } from "@/lib/learning/analytics";
+
+const FOCUS_LABEL: Record<FocusReason, string> = {
+  weak: "Needs work",
+  shaky: "Build confidence",
+  practice: "Keep practising",
+};
 
 export const metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -101,6 +109,14 @@ export default async function DashboardPage() {
   const stats = overallStats(attempts);
   const timeline = accuracyTimeline(attempts);
   const gains = new Map(domainGains(attempts).map((g) => [g.domainSlug, g]));
+  const focus = focusAreas(
+    mastery.map((r) => ({
+      slug: r.domain_slug,
+      mastery: r.mastery,
+      confidence: r.confidence,
+      attempts: r.attempts,
+    })),
+  );
 
   return (
     <div className="space-y-8">
@@ -116,6 +132,37 @@ export default async function DashboardPage() {
         <StatTile label="Questions answered" value={String(stats.totalAnswered)} />
         <StatTile label="Overall accuracy" value={`${Math.round(stats.accuracy * 100)}%`} />
       </section>
+
+      {focus.length > 0 && (
+        <Card className="border-primary/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Target className="text-primary size-4" />
+              Focus areas
+            </CardTitle>
+            <p className="text-muted-foreground text-sm">
+              Spend your next sessions here first — the highest-value ground to make up.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {focus.map((area) => (
+              <div
+                key={area.slug}
+                className="flex items-center justify-between gap-3 rounded-lg border p-3"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{displayName(area.slug, titles)}</span>
+                  <Badge variant="secondary">{FOCUS_LABEL[area.reason]}</Badge>
+                </div>
+                <Button size="sm" variant="outline" render={<Link href={`/quiz/${area.slug}`} />}>
+                  Practise
+                  <ArrowRight className="size-3.5" />
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {timeline.length >= 2 && (
         <Card>
@@ -172,6 +219,16 @@ export default async function DashboardPage() {
                       </span>
                     )}
                   </div>
+                  {needsFoundationalWork({
+                    slug: row.domain_slug,
+                    mastery: row.mastery,
+                    confidence: row.confidence,
+                    attempts: row.attempts,
+                  }) && (
+                    <p className="bg-accent text-accent-foreground rounded-md px-2 py-1.5 text-xs">
+                      Shaky foundations here — try an easier quiz to shore up the basics first.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             );
