@@ -5,6 +5,20 @@ Newest first.
 
 ---
 
+## 2026-10-27 — Phase 4A: difficulty recommendation (#3, #14)
+
+**Completed** (branch `feat/phase-4a-difficulty-reco`, test-first) — Deterministic
+`recommendDifficulty(masteryState)` (unit-tested): eases beginners in at level 2, maps mastery to a
+1–5 band, and holds back the hardest levels until confidence is established (progressive load).
+The quiz screen fetches the user's domain mastery, pre-selects the suggested level, and badges it
+"Suggested" — the user always overrides. `/quiz/[domain]` is now dynamic (reads the session).
+Verified: 50 unit/integration tests + 5 e2e (mock) + build green. No migration / user action.
+
+**Next**: 4B custom topic search (#2); 4C multi-select + written formats (#11); lightweight 80/20
+(#7) + foundational-gap (#12).
+
+---
+
 ## 2026-10-27 — Phase 3B: analytics dashboard (#9, #13)
 
 **Completed** (branch `feat/phase-3b-analytics`, test-first)

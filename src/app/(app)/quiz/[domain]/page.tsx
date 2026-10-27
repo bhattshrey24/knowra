@@ -3,10 +3,13 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { DOMAINS } from "@/lib/domains";
 import { QuizSession } from "@/components/quiz-session";
+import { createClient } from "@/lib/db/server";
+import { isSupabaseConfigured } from "@/lib/env";
+import { recommendDifficulty } from "@/lib/learning/recommend";
+import type { MasteryState } from "@/lib/learning/mastery";
+import type { Difficulty } from "@/types/learning";
 
-export function generateStaticParams() {
-  return DOMAINS.map((d) => ({ domain: d.slug }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ domain: string }> }) {
   const { domain } = await params;
@@ -14,10 +17,34 @@ export async function generateMetadata({ params }: { params: Promise<{ domain: s
   return { title: found ? `Quiz · ${found.name}` : "Quiz" };
 }
 
+/** The personalised difficulty for this user+domain, or undefined if unknown. */
+async function recommendedFor(domainSlug: string): Promise<Difficulty | undefined> {
+  if (!isSupabaseConfigured()) return undefined;
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return undefined;
+    const { data } = await supabase
+      .from("domain_mastery")
+      .select("mastery,confidence,attempts,correct")
+      .eq("user_id", user.id)
+      .eq("domain_slug", domainSlug)
+      .maybeSingle();
+    if (!data) return undefined;
+    return recommendDifficulty(data as MasteryState);
+  } catch {
+    return undefined;
+  }
+}
+
 export default async function QuizStartPage({ params }: { params: Promise<{ domain: string }> }) {
   const { domain } = await params;
   const found = DOMAINS.find((d) => d.slug === domain);
   if (!found) notFound();
+
+  const recommendedDifficulty = await recommendedFor(found.slug);
 
   return (
     <div className="mx-auto max-w-xl space-y-8">
@@ -34,7 +61,11 @@ export default async function QuizStartPage({ params }: { params: Promise<{ doma
         <p className="text-muted-foreground mt-1 text-sm">{found.description}</p>
       </div>
 
-      <QuizSession domainSlug={found.slug} domainName={found.name} />
+      <QuizSession
+        domainSlug={found.slug}
+        domainName={found.name}
+        recommendedDifficulty={recommendedDifficulty}
+      />
     </div>
   );
 }
