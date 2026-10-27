@@ -5,6 +5,27 @@ Newest first.
 
 ---
 
+## 2026-10-27 — Phase 4B: custom topic search (#2)
+
+**Completed** (branch `feat/phase-4b-custom-topics`, test-first)
+
+- `learnable.ts` (unit-tested): a "learnable" is a predefined domain OR a custom topic; custom
+  slugs are kebab-cased and `t-`-prefixed so they never collide with predefined slugs.
+- Migration `0004`: `custom_topics` (user_id, slug, title) with RLS.
+- `POST /api/topics` finds/creates a user's topic (rate-limited); home search shows a
+  "Quiz me on …" CTA when no preset matches (only when a backend is available).
+- `resolveLearnable` (server) now backs `/quiz/[domain]`, `/api/quiz`, and `/api/attempts`, so a
+  custom topic quizzes, persists, and shows up on the dashboard/flashcards by its title.
+- Vitest: stubbed the `server-only` package (Next provides it at build; node tests can't resolve it).
+- Verified offline: 56 unit/integration tests + 5 e2e (mock) + build green.
+
+**Blocked on user**: apply `supabase/migrations/0004_custom_topics.sql`, then type any topic on the
+home screen → "Quiz me on …".
+
+**Next**: 4C multi-select + written formats (#11); lightweight 80/20 (#7) + foundational-gap (#12).
+
+---
+
 ## 2026-10-27 — Phase 4A: difficulty recommendation (#3, #14)
 
 **Completed** (branch `feat/phase-4a-difficulty-reco`, test-first) — Deterministic

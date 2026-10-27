@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { EmptyState } from "@/components/empty-state";
 import { AccuracyChart } from "@/components/accuracy-chart";
-import { DOMAINS } from "@/lib/domains";
+import { predefinedLearnable } from "@/lib/learnable";
 import { createClient } from "@/lib/db/server";
+import { customTitleMap } from "@/lib/db/learnable-server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { masteryOutOfTen, type MasteryState } from "@/lib/learning/mastery";
 import {
@@ -23,15 +24,19 @@ interface MasteryRow extends MasteryState {
   domain_slug: string;
 }
 
-async function loadData(): Promise<{ mastery: MasteryRow[]; attempts: AttemptLike[] }> {
-  if (!isSupabaseConfigured()) return { mastery: [], attempts: [] };
+async function loadData(): Promise<{
+  mastery: MasteryRow[];
+  attempts: AttemptLike[];
+  titles: Map<string, string>;
+}> {
+  if (!isSupabaseConfigured()) return { mastery: [], attempts: [], titles: new Map() };
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { mastery: [], attempts: [] };
+  if (!user) return { mastery: [], attempts: [], titles: new Map() };
 
-  const [masteryRes, attemptsRes] = await Promise.all([
+  const [masteryRes, attemptsRes, titles] = await Promise.all([
     supabase
       .from("domain_mastery")
       .select("domain_slug,mastery,confidence,attempts,correct")
@@ -42,6 +47,7 @@ async function loadData(): Promise<{ mastery: MasteryRow[]; attempts: AttemptLik
       .select("domain_slug,total,correct,created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: true }),
+    customTitleMap(),
   ]);
 
   const attempts = (attemptsRes.data ?? []).map((a) => ({
@@ -51,7 +57,11 @@ async function loadData(): Promise<{ mastery: MasteryRow[]; attempts: AttemptLik
     createdAt: a.created_at as string,
   }));
 
-  return { mastery: (masteryRes.data as MasteryRow[] | null) ?? [], attempts };
+  return { mastery: (masteryRes.data as MasteryRow[] | null) ?? [], attempts, titles };
+}
+
+function displayName(slug: string, titles: Map<string, string>): string {
+  return predefinedLearnable(slug)?.name ?? titles.get(slug) ?? slug;
 }
 
 function StatTile({ label, value }: { label: string; value: string }) {
@@ -66,7 +76,7 @@ function StatTile({ label, value }: { label: string; value: string }) {
 }
 
 export default async function DashboardPage() {
-  const { mastery, attempts } = await loadData();
+  const { mastery, attempts, titles } = await loadData();
 
   if (mastery.length === 0 && attempts.length === 0) {
     return (
@@ -122,7 +132,7 @@ export default async function DashboardPage() {
         <h2 className="text-lg font-medium">By subject</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           {mastery.map((row) => {
-            const domain = DOMAINS.find((d) => d.slug === row.domain_slug);
+            const name = displayName(row.domain_slug, titles);
             const outOfTen = masteryOutOfTen(row);
             const accuracy = row.attempts ? Math.round((row.correct / row.attempts) * 100) : 0;
             const gain = gains.get(row.domain_slug);
@@ -131,7 +141,7 @@ export default async function DashboardPage() {
               <Card key={row.domain_slug}>
                 <CardHeader className="pb-3">
                   <div className="flex items-baseline justify-between">
-                    <CardTitle className="text-base">{domain?.name ?? row.domain_slug}</CardTitle>
+                    <CardTitle className="text-base">{name}</CardTitle>
                     <span className="text-sm font-semibold">
                       {outOfTen}
                       <span className="text-muted-foreground">/10</span>
@@ -139,7 +149,7 @@ export default async function DashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <Progress value={row.mastery * 100} aria-label={`${domain?.name} mastery`} />
+                  <Progress value={row.mastery * 100} aria-label={`${name} mastery`} />
                   <div className="text-muted-foreground flex items-center justify-between text-xs">
                     <span>
                       {row.attempts} answered · {accuracy}% correct

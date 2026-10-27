@@ -47,7 +47,8 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 - ✅ 4A: Deterministic difficulty recommendation (`recommend.ts`, unit-tested) — suggested level
   shown + pre-selected on the quiz screen, with progressive load (holds back hardest until
   confidence builds) (#3, #14). User always overrides.
-- ⬜ 4B: Custom topic search (#2)
+- ✅ 4B: Custom topic search (#2) — type any topic, quiz on it; it becomes its own subject that
+  rolls up attempts/mastery/flashcards (migration `0004`)
 - ⬜ 4C: Multi-select + written question formats (#11)
 - ⬜ 80/20 prioritization (#7), foundational-gap detection (#12) — lightweight versions planned
 
@@ -56,7 +57,7 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 | #   | Feature                               | Phase | Status | Notes                                                                                     |
 | --- | ------------------------------------- | ----- | ------ | ----------------------------------------------------------------------------------------- |
 | 1   | Predefined domains homepage           | 1 / 2 | ✅     | Home → select domain → real generated quiz; attempts persisted (anon auth + Supabase).    |
-| 2   | Custom topic search                   | 4     | ⬜     | Search any topic; map/create domain; progress by domain.                                  |
+| 2   | Custom topic search                   | 4     | 🟨     | Quiz any typed topic; rolls up as its own subject. Verify live after `0004`.              |
 | 3   | Adjustable difficulty 1–5 + recommend | 1 / 4 | ✅     | Select 1–5; system suggests a level from mastery (user overrides).                        |
 | 4   | Weakness detection + flashcards       | 2     | 🟨     | Weakness (wrong) + foundational (right) cards, distinctly tagged; verify live via a quiz. |
 | 5   | AI learning assistant (chatbot)       | 6     | ⬜     | Optional; scoped to user's profile/mistakes.                                              |

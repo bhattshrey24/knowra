@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { DOMAINS } from "@/lib/domains";
 import { getLLMProvider } from "@/lib/llm";
+import { resolveLearnable } from "@/lib/db/learnable-server";
 import { rateLimit } from "@/lib/rate-limit";
 import type { Difficulty, Question } from "@/types/learning";
 
@@ -44,18 +44,18 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const { domain, difficulty, count } = parsed.data;
-  const found = DOMAINS.find((d) => d.slug === domain);
-  if (!found) {
-    return NextResponse.json({ error: "Unknown domain" }, { status: 404 });
+  const learnable = await resolveLearnable(domain);
+  if (!learnable) {
+    return NextResponse.json({ error: "Unknown topic" }, { status: 404 });
   }
 
   const provider = getLLMProvider();
   let generated;
   try {
     generated = await provider.generateQuestions({
-      conceptName: found.name,
-      topicName: found.name,
-      domainName: found.name,
+      conceptName: learnable.name,
+      topicName: learnable.name,
+      domainName: learnable.name,
       difficulty: difficulty as Difficulty,
       formats: ["mcq"],
       count,
@@ -67,8 +67,13 @@ export async function POST(req: Request): Promise<Response> {
   const questions: Question[] = generated.map((g) => ({
     ...g,
     id: randomUUID(),
-    conceptId: found.slug,
+    conceptId: learnable.slug,
   }));
 
-  return NextResponse.json({ domain: found.slug, difficulty, provider: provider.id, questions });
+  return NextResponse.json({
+    domain: learnable.slug,
+    difficulty,
+    provider: provider.id,
+    questions,
+  });
 }

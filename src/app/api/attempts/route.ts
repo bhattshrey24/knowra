@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { DOMAINS } from "@/lib/domains";
 import { createClient } from "@/lib/db/server";
+import { resolveLearnable } from "@/lib/db/learnable-server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { isAnswerCorrect } from "@/lib/learning/scoring";
 import { INITIAL_MASTERY, applyOutcomes, type MasteryState } from "@/lib/learning/mastery";
@@ -46,9 +46,6 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const { domain, difficulty, answers } = parsed.data;
-  if (!DOMAINS.some((d) => d.slug === domain)) {
-    return NextResponse.json({ error: "Unknown domain" }, { status: 404 });
-  }
 
   try {
     const supabase = await createClient();
@@ -57,6 +54,11 @@ export async function POST(req: Request): Promise<Response> {
     } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ persisted: false, reason: "no-session" });
+    }
+
+    const learnable = await resolveLearnable(domain);
+    if (!learnable) {
+      return NextResponse.json({ error: "Unknown topic" }, { status: 404 });
     }
 
     // Scoring is recomputed server-side from the provided answer key.

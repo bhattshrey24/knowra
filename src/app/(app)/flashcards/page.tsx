@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { Flashcard } from "@/components/flashcard";
 import { ReviewSession, type DueCard } from "@/components/review-session";
-import { DOMAINS } from "@/lib/domains";
+import { predefinedLearnable } from "@/lib/learnable";
 import { createClient } from "@/lib/db/server";
+import { customTitleMap } from "@/lib/db/learnable-server";
 import { isSupabaseConfigured } from "@/lib/env";
 import type { FlashcardType } from "@/types/learning";
 
@@ -22,23 +23,26 @@ interface CardRow {
   due_at: string;
 }
 
-async function loadCards(): Promise<CardRow[]> {
-  if (!isSupabaseConfigured()) return [];
+async function loadCards(): Promise<{ cards: CardRow[]; titles: Map<string, string> }> {
+  if (!isSupabaseConfigured()) return { cards: [], titles: new Map() };
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return [];
-  const { data } = await supabase
-    .from("flashcards")
-    .select("id,domain_slug,type,front,back,due_at")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
-  return (data as CardRow[] | null) ?? [];
+  if (!user) return { cards: [], titles: new Map() };
+  const [cardsRes, titles] = await Promise.all([
+    supabase
+      .from("flashcards")
+      .select("id,domain_slug,type,front,back,due_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false }),
+    customTitleMap(),
+  ]);
+  return { cards: (cardsRes.data as CardRow[] | null) ?? [], titles };
 }
 
-function domainName(slug: string): string {
-  return DOMAINS.find((d) => d.slug === slug)?.name ?? slug;
+function displayName(slug: string, titles: Map<string, string>): string {
+  return predefinedLearnable(slug)?.name ?? titles.get(slug) ?? slug;
 }
 
 function Section({
@@ -46,11 +50,13 @@ function Section({
   description,
   badge,
   cards,
+  titles,
 }: {
   title: string;
   description: string;
   badge: React.ReactNode;
   cards: CardRow[];
+  titles: Map<string, string>;
 }) {
   return (
     <section className="space-y-3">
@@ -62,7 +68,12 @@ function Section({
       <p className="text-muted-foreground text-sm">{description}</p>
       <div className="grid gap-3 sm:grid-cols-2">
         {cards.map((c) => (
-          <Flashcard key={c.id} front={c.front} back={c.back} hint={domainName(c.domain_slug)} />
+          <Flashcard
+            key={c.id}
+            front={c.front}
+            back={c.back}
+            hint={displayName(c.domain_slug, titles)}
+          />
         ))}
       </div>
     </section>
@@ -70,7 +81,7 @@ function Section({
 }
 
 export default async function FlashcardsPage() {
-  const cards = await loadCards();
+  const { cards, titles } = await loadCards();
 
   if (cards.length === 0) {
     return (
@@ -99,7 +110,12 @@ export default async function FlashcardsPage() {
   const now = Date.now();
   const dueCards: DueCard[] = cards
     .filter((c) => new Date(c.due_at).getTime() <= now)
-    .map((c) => ({ id: c.id, front: c.front, back: c.back, hint: domainName(c.domain_slug) }));
+    .map((c) => ({
+      id: c.id,
+      front: c.front,
+      back: c.back,
+      hint: displayName(c.domain_slug, titles),
+    }));
 
   return (
     <div className="space-y-10">
@@ -130,6 +146,7 @@ export default async function FlashcardsPage() {
           description="Concepts you missed — the highest-value things to review."
           badge={<Badge variant="destructive">Review</Badge>}
           cards={weakness}
+          titles={titles}
         />
       )}
 
@@ -139,6 +156,7 @@ export default async function FlashcardsPage() {
           description="Core concepts worth keeping sharp, including ones you already know."
           badge={<Badge variant="secondary">Foundational</Badge>}
           cards={foundational}
+          titles={titles}
         />
       )}
     </div>

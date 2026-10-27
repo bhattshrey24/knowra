@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { DOMAINS } from "@/lib/domains";
 import { QuizSession } from "@/components/quiz-session";
+import { predefinedLearnable } from "@/lib/learnable";
+import { resolveLearnable } from "@/lib/db/learnable-server";
 import { createClient } from "@/lib/db/server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { recommendDifficulty } from "@/lib/learning/recommend";
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ domain: string }> }) {
   const { domain } = await params;
-  const found = DOMAINS.find((d) => d.slug === domain);
+  const found = predefinedLearnable(domain);
   return { title: found ? `Quiz · ${found.name}` : "Quiz" };
 }
 
@@ -41,7 +42,7 @@ async function recommendedFor(domainSlug: string): Promise<Difficulty | undefine
 
 export default async function QuizStartPage({ params }: { params: Promise<{ domain: string }> }) {
   const { domain } = await params;
-  const found = DOMAINS.find((d) => d.slug === domain);
+  const found = await resolveLearnable(domain);
   if (!found) notFound();
 
   const recommendedDifficulty = await recommendedFor(found.slug);
