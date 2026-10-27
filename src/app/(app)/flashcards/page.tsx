@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { Flashcard } from "@/components/flashcard";
+import { ReviewSession, type DueCard } from "@/components/review-session";
 import { DOMAINS } from "@/lib/domains";
 import { createClient } from "@/lib/db/server";
 import { isSupabaseConfigured } from "@/lib/env";
@@ -18,6 +19,7 @@ interface CardRow {
   type: FlashcardType;
   front: string;
   back: string;
+  due_at: string;
 }
 
 async function loadCards(): Promise<CardRow[]> {
@@ -29,7 +31,7 @@ async function loadCards(): Promise<CardRow[]> {
   if (!user) return [];
   const { data } = await supabase
     .from("flashcards")
-    .select("id,domain_slug,type,front,back")
+    .select("id,domain_slug,type,front,back,due_at")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
   return (data as CardRow[] | null) ?? [];
@@ -94,6 +96,11 @@ export default async function FlashcardsPage() {
   const weakness = cards.filter((c) => c.type === "weakness");
   const foundational = cards.filter((c) => c.type === "foundational");
 
+  const now = Date.now();
+  const dueCards: DueCard[] = cards
+    .filter((c) => new Date(c.due_at).getTime() <= now)
+    .map((c) => ({ id: c.id, front: c.front, back: c.back, hint: domainName(c.domain_slug) }));
+
   return (
     <div className="space-y-10">
       <div>
@@ -103,6 +110,19 @@ export default async function FlashcardsPage() {
           cards reinforce the essentials.
         </p>
       </div>
+
+      {dueCards.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-medium">
+            Due for review <span className="text-muted-foreground">· {dueCards.length}</span>
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            Spaced repetition brings cards back at the right time. Rate your recall to reschedule
+            each one.
+          </p>
+          <ReviewSession cards={dueCards} />
+        </section>
+      )}
 
       {weakness.length > 0 && (
         <Section

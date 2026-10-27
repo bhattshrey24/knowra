@@ -5,6 +5,26 @@ Newest first.
 
 ---
 
+## 2026-10-27 — Phase 3A: spaced repetition (SM-2)
+
+**Completed** (branch `feat/phase-3-spaced-repetition`, test-first)
+
+- Deterministic **SM-2** engine (`sm2.ts`, unit-tested): classic 1→6→interval×ease progression,
+  ease floored at 1.3, lapses reset reps/interval. Grades: again/hard/good/easy → quality 2/3/4/5.
+- Migration `0003`: `reps, ease, interval_days, due_at (default now), last_reviewed_at` on
+  flashcards + a `(user_id, due_at)` index. New cards are due immediately.
+- `POST /api/flashcards/review` recomputes the schedule server-side and updates the card under RLS.
+- Flashcards page: "Due for review" session (reveal → rate) that reschedules each card (#6).
+- Verified offline: 42 unit/integration tests + 4 e2e (mock) + build green.
+
+**Blocked on user**: apply `supabase/migrations/0003_spaced_repetition.sql`. New cards become due
+immediately, so review is demoable right after taking a quiz (no waiting).
+
+**Next**: Phase 3B — analytics dashboard (#9) + baseline/retention (#13), reading existing
+`quiz_attempts` (no new migration).
+
+---
+
 ## 2026-10-27 — Phase 2C: flashcards
 
 **Completed** — Deterministic `buildFlashcardsFromQuiz` (unit-tested): wrong answers → **weakness**
