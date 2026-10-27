@@ -17,6 +17,19 @@ test("a learner can complete a full quiz and see a score", async ({ page }) => {
   await expect(page.getByRole("button", { name: "New quiz" })).toBeVisible();
 });
 
+test("multiple-select format lets you pick several answers", async ({ page }) => {
+  await page.goto("/quiz/science");
+  await page.getByRole("button", { name: /Multiple select/ }).click();
+  await page.getByRole("button", { name: "Start quiz" }).click();
+
+  await expect(page.getByText("Select all that apply.")).toBeVisible();
+  const options = page.getByRole("option");
+  await options.nth(0).click();
+  await options.nth(2).click();
+  await page.getByRole("button", { name: "Next question" }).click();
+  await expect(page.getByText("Question 2 of 5")).toBeVisible();
+});
+
 test("difficulty can be chosen before starting", async ({ page }) => {
   await page.goto("/quiz/science");
   const hard = page.getByRole("button", { name: "Difficulty 4: Hard" });

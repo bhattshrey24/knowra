@@ -21,13 +21,38 @@ export class MockLLMProvider implements LLMProvider {
 
   async generateQuestions(input: GenerateQuestionsInput): Promise<GeneratedQuestion[]> {
     const count = Math.max(1, Math.min(input.count, 20));
+    const format = input.formats[0] ?? "mcq";
     return Array.from({ length: count }, (_, i) => {
-      const correctIndex = i % 4;
       const options = Array.from({ length: 4 }, (_, j) => `${input.conceptName} — choice ${j + 1}`);
+      const prompt = `[${input.domainName}] Practice question ${i + 1} on "${input.conceptName}" (level ${input.difficulty}).`;
+
+      if (format === "written") {
+        return {
+          difficulty: input.difficulty,
+          format: "written" as const,
+          prompt: `Explain in your own words: ${input.conceptName} (question ${i + 1}).`,
+          referenceAnswer: `A good answer covers the core idea of "${input.conceptName}".`,
+          explanation: `This is mock reference content for "${input.conceptName}".`,
+        };
+      }
+
+      if (format === "multi") {
+        const correctIndices = [0, (i % 2) + 2]; // two correct, deterministic
+        return {
+          difficulty: input.difficulty,
+          format: "multi" as const,
+          prompt,
+          options,
+          correctIndices,
+          explanation: `Choices ${correctIndices.map((n) => n + 1).join(" and ")} are correct (mock).`,
+        };
+      }
+
+      const correctIndex = i % 4;
       return {
         difficulty: input.difficulty,
         format: "mcq" as const,
-        prompt: `[${input.domainName}] Practice question ${i + 1} on "${input.conceptName}" (level ${input.difficulty}).`,
+        prompt,
         options,
         correctIndices: [correctIndex],
         explanation: `The correct answer is choice ${correctIndex + 1}. This is mock content for "${input.conceptName}".`,

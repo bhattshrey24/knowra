@@ -12,6 +12,7 @@ const bodySchema = z.object({
   domain: z.string().min(1).max(100),
   difficulty: z.number().int().min(1).max(5),
   count: z.number().int().min(1).max(10).default(5),
+  format: z.enum(["mcq", "multi"]).default("mcq"),
 });
 
 function clientKey(req: Request): string {
@@ -43,7 +44,7 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  const { domain, difficulty, count } = parsed.data;
+  const { domain, difficulty, count, format } = parsed.data;
   const learnable = await resolveLearnable(domain);
   if (!learnable) {
     return NextResponse.json({ error: "Unknown topic" }, { status: 404 });
@@ -57,7 +58,7 @@ export async function POST(req: Request): Promise<Response> {
       topicName: learnable.name,
       domainName: learnable.name,
       difficulty: difficulty as Difficulty,
-      formats: ["mcq"],
+      formats: [format],
       count,
     });
   } catch {

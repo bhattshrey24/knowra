@@ -5,6 +5,20 @@ Newest first.
 
 ---
 
+## 2026-10-27 — Phase 4C: multi-select format (#11)
+
+**Completed** (branch `feat/phase-4c-multiselect`, test-first) — Added multiple-select questions:
+`llmMultiSchema`/`parseLlmMulti`/`toGeneratedMultiQuestion` (unit-tested; 1+ distinct, in-range
+correct indices); mock + Gemini providers branch on the requested format; `/api/quiz` takes a
+`format` (mcq|multi). Quiz screen gains a format picker; multi uses a checkbox UI and set-equality
+scoring (reuses `isAnswerCorrect`), so it persists + makes flashcards exactly like MCQ — **no
+migration**. Verified: 61 unit/integration tests + 6 e2e (mock, incl. multi-select) + build green.
+
+**Next**: 4D written (free-text) format — needs a text-answer column on `attempt_answers` and a
+grader (deterministic word-overlap, with LLM `gradeWritten` as an enhancement).
+
+---
+
 ## 2026-10-27 — Phase 4B: custom topic search (#2)
 
 **Completed** (branch `feat/phase-4b-custom-topics`, test-first)
