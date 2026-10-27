@@ -5,11 +5,12 @@ import { Check, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { scoreQuiz, type QuizSummary } from "@/lib/learning/scoring";
+import { isAnswerCorrect, type QuizSummary } from "@/lib/learning/scoring";
+import { gradeWritten, isWrittenCorrect } from "@/lib/learning/grade-written";
 import type { Difficulty, Question } from "@/types/learning";
 
 type Status = "setup" | "loading" | "active" | "error" | "results";
-type QuizFormat = "mcq" | "multi";
+type QuizFormat = "mcq" | "multi" | "written";
 
 const LEVELS: { value: Difficulty; label: string }[] = [
   { value: 1, label: "Beginner" },
@@ -22,6 +23,7 @@ const LEVELS: { value: Difficulty; label: string }[] = [
 const FORMATS: { value: QuizFormat; label: string; hint: string }[] = [
   { value: "mcq", label: "Multiple choice", hint: "One correct answer" },
   { value: "multi", label: "Multiple select", hint: "One or more correct" },
+  { value: "written", label: "Written", hint: "Type your answer" },
 ];
 
 export function QuizSession({
@@ -39,6 +41,7 @@ export function QuizSession({
   const [questions, setQuestions] = useState<Question[]>([]);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number[]>>({});
+  const [written, setWritten] = useState<Record<string, string>>({});
   const [summary, setSummary] = useState<QuizSummary | null>(null);
 
   async function startQuiz() {
@@ -54,6 +57,7 @@ export function QuizSession({
       if (!data.questions?.length) throw new Error("No questions returned");
       setQuestions(data.questions);
       setAnswers({});
+      setWritten({});
       setCurrent(0);
       setStatus("active");
     } catch {
@@ -83,13 +87,23 @@ export function QuizSession({
         difficulty,
         answers: questions.map((q) => ({
           prompt: q.prompt,
+          format: q.format,
           options: q.options ?? [],
           selected: answers[q.id] ?? [],
           correctIndices: q.correctIndices ?? [],
           explanation: q.explanation,
+          writtenAnswer: written[q.id],
+          referenceAnswer: q.referenceAnswer,
         })),
       }),
     }).catch(() => {});
+  }
+
+  function gradeQuestion(q: Question): boolean {
+    if (q.format === "written") {
+      return isWrittenCorrect(gradeWritten(q.referenceAnswer ?? "", written[q.id] ?? ""));
+    }
+    return isAnswerCorrect(q.correctIndices ?? [], answers[q.id] ?? []);
   }
 
   function advance() {
@@ -97,15 +111,19 @@ export function QuizSession({
       setCurrent((c) => c + 1);
       return;
     }
-    setSummary(
-      scoreQuiz(
-        questions.map((q) => ({
-          questionId: q.id,
-          correctIndices: q.correctIndices ?? [],
-          selected: answers[q.id] ?? [],
-        })),
-      ),
-    );
+    const results = questions.map((q) => ({
+      questionId: q.id,
+      selected: answers[q.id] ?? [],
+      correct: gradeQuestion(q),
+    }));
+    const correctCount = results.filter((r) => r.correct).length;
+    const total = results.length;
+    setSummary({
+      correct: correctCount,
+      total,
+      percent: total ? Math.round((correctCount / total) * 100) : 0,
+      results,
+    });
     setStatus("results");
     persistAttempt();
   }
@@ -115,6 +133,7 @@ export function QuizSession({
     setQuestions([]);
     setSummary(null);
     setAnswers({});
+    setWritten({});
     setCurrent(0);
   }
 
@@ -246,13 +265,30 @@ export function QuizSession({
                   </span>
                   <div className="space-y-1">
                     <p className="text-sm font-medium">{q.prompt}</p>
-                    {!correct && chosenText && (
-                      <p className="text-muted-foreground text-sm">You chose: {chosenText}</p>
-                    )}
-                    {correctText && (
-                      <p className="text-sm text-emerald-700 dark:text-emerald-400">
-                        Correct: {correctText}
-                      </p>
+                    {q.format === "written" ? (
+                      <>
+                        {written[q.id]?.trim() && (
+                          <p className="text-muted-foreground text-sm">
+                            Your answer: {written[q.id]}
+                          </p>
+                        )}
+                        {q.referenceAnswer && (
+                          <p className="text-sm text-emerald-700 dark:text-emerald-400">
+                            Reference: {q.referenceAnswer}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {!correct && chosenText && (
+                          <p className="text-muted-foreground text-sm">You chose: {chosenText}</p>
+                        )}
+                        {correctText && (
+                          <p className="text-sm text-emerald-700 dark:text-emerald-400">
+                            Correct: {correctText}
+                          </p>
+                        )}
+                      </>
                     )}
                     {q.explanation && (
                       <p className="text-muted-foreground text-sm">{q.explanation}</p>
@@ -275,8 +311,11 @@ export function QuizSession({
   // status === "active"
   const question = questions[current];
   const selectedIndices = answers[question.id] ?? [];
-  const answered = selectedIndices.length > 0;
   const isMulti = question.format === "multi";
+  const isWritten = question.format === "written";
+  const answered = isWritten
+    ? (written[question.id]?.trim().length ?? 0) > 0
+    : selectedIndices.length > 0;
   const isLast = current === questions.length - 1;
 
   return (
@@ -296,45 +335,59 @@ export function QuizSession({
       <div>
         <h2 className="text-lg font-medium">{question.prompt}</h2>
         {isMulti && <p className="text-muted-foreground mt-1 text-xs">Select all that apply.</p>}
+        {isWritten && (
+          <p className="text-muted-foreground mt-1 text-xs">Answer in your own words.</p>
+        )}
       </div>
 
-      <div
-        className="grid gap-2"
-        role="listbox"
-        aria-multiselectable={isMulti}
-        aria-label="Answer options"
-      >
-        {question.options?.map((option, index) => {
-          const active = selectedIndices.includes(index);
-          return (
-            <button
-              key={index}
-              type="button"
-              role="option"
-              aria-selected={active}
-              onClick={() => select(question.id, index)}
-              className={cn(
-                "flex items-center gap-3 rounded-lg border p-3 text-left text-sm transition-colors",
-                active
-                  ? "border-primary bg-accent text-accent-foreground"
-                  : "hover:border-primary/40",
-              )}
-            >
-              <span
+      {isWritten ? (
+        <textarea
+          value={written[question.id] ?? ""}
+          onChange={(e) => setWritten((prev) => ({ ...prev, [question.id]: e.target.value }))}
+          placeholder="Type your answer…"
+          aria-label="Your answer"
+          rows={5}
+          className="bg-background focus-visible:border-primary focus-visible:ring-ring/40 w-full rounded-lg border p-3 text-sm outline-none focus-visible:ring-2"
+        />
+      ) : (
+        <div
+          className="grid gap-2"
+          role="listbox"
+          aria-multiselectable={isMulti}
+          aria-label="Answer options"
+        >
+          {question.options?.map((option, index) => {
+            const active = selectedIndices.includes(index);
+            return (
+              <button
+                key={index}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => select(question.id, index)}
                 className={cn(
-                  "flex size-4 shrink-0 items-center justify-center border",
-                  isMulti ? "rounded-sm" : "rounded-full",
-                  active ? "border-primary bg-primary text-primary-foreground" : "border-input",
+                  "flex items-center gap-3 rounded-lg border p-3 text-left text-sm transition-colors",
+                  active
+                    ? "border-primary bg-accent text-accent-foreground"
+                    : "hover:border-primary/40",
                 )}
-                aria-hidden
               >
-                {active && <Check className="size-3" />}
-              </span>
-              {option}
-            </button>
-          );
-        })}
-      </div>
+                <span
+                  className={cn(
+                    "flex size-4 shrink-0 items-center justify-center border",
+                    isMulti ? "rounded-sm" : "rounded-full",
+                    active ? "border-primary bg-primary text-primary-foreground" : "border-input",
+                  )}
+                  aria-hidden
+                >
+                  {active && <Check className="size-3" />}
+                </span>
+                {option}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <Button size="lg" onClick={advance} disabled={!answered}>
         {isLast ? "Finish" : "Next question"}

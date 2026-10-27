@@ -5,6 +5,23 @@ Newest first.
 
 ---
 
+## 2026-10-27 — Phase 4D: written questions (#11 complete)
+
+**Completed** (branch `feat/phase-4d-written`, test-first) — Free-text questions: `grade-written.ts`
+(unit-tested) scores an answer by how many reference keywords it covers (stopwords ignored),
+threshold 0.5; `llmWrittenSchema`/`parseLlmWritten`/`toGeneratedWrittenQuestion`; mock + Gemini
+generate written; `/api/quiz` format enum adds `written`. Quiz UI: textarea; format-aware scoring
+and results (shows your answer + reference). Migration `0005` adds `written_answer`/
+`reference_answer` to `attempt_answers`; `/api/attempts` grades written server-side, persists, and
+makes flashcards (builder now format-aware). **All three formats (#11) done.** Verified: 66
+unit/integration tests + 7 e2e (mock) + build green.
+
+**Blocked on user**: apply `supabase/migrations/0005_written_answers.sql` to persist written attempts.
+
+**Next**: lightweight 80/20 focus (#7) + foundational-gap hints (#12) to close Phase 4.
+
+---
+
 ## 2026-10-27 — Phase 4C: multi-select format (#11)
 
 **Completed** (branch `feat/phase-4c-multiselect`, test-first) — Added multiple-select questions:

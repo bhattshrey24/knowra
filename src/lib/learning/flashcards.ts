@@ -2,19 +2,23 @@
  * Builds revision flashcards from a quiz attempt — part of the deterministic,
  * LLM-independent engine. Wrong answers become **weakness** cards (concepts to
  * improve); a capped number of correct answers become **foundational** cards
- * (concepts worth reinforcing, including ones the learner already knows). The
- * two types are tagged distinctly (FEATURES.md #4).
+ * (concepts worth reinforcing). Works for MCQ, multi-select, and written
+ * questions. The two types are tagged distinctly (FEATURES.md #4).
  */
 
 import { isAnswerCorrect } from "@/lib/learning/scoring";
-import type { FlashcardType } from "@/types/learning";
+import { gradeWritten, isWrittenCorrect } from "@/lib/learning/grade-written";
+import type { FlashcardType, QuestionFormat } from "@/types/learning";
 
 export interface QuizAnswerInput {
   prompt: string;
-  options: string[];
-  selected: number[];
-  correctIndices: number[];
+  format?: QuestionFormat;
+  options?: string[];
+  selected?: number[];
+  correctIndices?: number[];
   explanation?: string;
+  referenceAnswer?: string;
+  writtenAnswer?: string;
 }
 
 export interface BuiltFlashcard {
@@ -23,12 +27,21 @@ export interface BuiltFlashcard {
   back: string;
 }
 
+function isCorrect(answer: QuizAnswerInput): boolean {
+  if (answer.format === "written") {
+    return isWrittenCorrect(gradeWritten(answer.referenceAnswer ?? "", answer.writtenAnswer ?? ""));
+  }
+  return isAnswerCorrect(answer.correctIndices ?? [], answer.selected ?? []);
+}
+
 function buildBack(answer: QuizAnswerInput): string {
-  const correctText = answer.correctIndices
-    .map((i) => answer.options[i])
-    .filter(Boolean)
-    .join(", ");
-  const base = `Answer: ${correctText}.`;
+  const base =
+    answer.format === "written"
+      ? `Answer: ${answer.referenceAnswer ?? ""}`.trim()
+      : `Answer: ${(answer.correctIndices ?? [])
+          .map((i) => answer.options?.[i])
+          .filter(Boolean)
+          .join(", ")}.`;
   return answer.explanation ? `${base} ${answer.explanation}` : base;
 }
 
@@ -41,7 +54,7 @@ export function buildFlashcardsFromQuiz(
   let foundational = 0;
 
   for (const answer of answers) {
-    if (!isAnswerCorrect(answer.correctIndices, answer.selected)) {
+    if (!isCorrect(answer)) {
       cards.push({ type: "weakness", front: answer.prompt, back: buildBack(answer) });
     } else if (foundational < maxFoundational) {
       cards.push({ type: "foundational", front: answer.prompt, back: buildBack(answer) });
