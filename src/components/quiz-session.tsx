@@ -56,6 +56,25 @@ export function QuizSession({
     setAnswers((prev) => ({ ...prev, [questionId]: [index] }));
   }
 
+  function persistAttempt() {
+    // Fire-and-forget: persistence is best-effort and no-ops without a backend.
+    void fetch("/api/attempts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        domain: domainSlug,
+        difficulty,
+        answers: questions.map((q) => ({
+          prompt: q.prompt,
+          options: q.options ?? [],
+          selected: answers[q.id] ?? [],
+          correctIndices: q.correctIndices ?? [],
+          explanation: q.explanation,
+        })),
+      }),
+    }).catch(() => {});
+  }
+
   function advance() {
     if (current < questions.length - 1) {
       setCurrent((c) => c + 1);
@@ -71,6 +90,7 @@ export function QuizSession({
       ),
     );
     setStatus("results");
+    persistAttempt();
   }
 
   function reset() {
