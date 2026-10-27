@@ -4,6 +4,7 @@ import { createClient } from "@/lib/db/server";
 import { resolveLearnable } from "@/lib/db/learnable-server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { isAnswerCorrect } from "@/lib/learning/scoring";
+import { gradeWritten, isWrittenCorrect } from "@/lib/learning/grade-written";
 import { INITIAL_MASTERY, applyOutcomes, type MasteryState } from "@/lib/learning/mastery";
 import { buildFlashcardsFromQuiz } from "@/lib/learning/flashcards";
 import type { Difficulty } from "@/types/learning";
@@ -17,10 +18,13 @@ const bodySchema = z.object({
     .array(
       z.object({
         prompt: z.string().min(1).max(1000),
-        options: z.array(z.string().min(1).max(500)).min(2).max(6),
-        selected: z.array(z.number().int().nonnegative()).max(6),
-        correctIndices: z.array(z.number().int().nonnegative()).min(1).max(6),
+        format: z.enum(["mcq", "multi", "written"]).default("mcq"),
+        options: z.array(z.string().min(1).max(500)).max(6).optional(),
+        selected: z.array(z.number().int().nonnegative()).max(6).optional(),
+        correctIndices: z.array(z.number().int().nonnegative()).max(6).optional(),
         explanation: z.string().max(2000).optional(),
+        writtenAnswer: z.string().max(5000).optional(),
+        referenceAnswer: z.string().max(2000).optional(),
       }),
     )
     .min(1)
@@ -61,9 +65,12 @@ export async function POST(req: Request): Promise<Response> {
       return NextResponse.json({ error: "Unknown topic" }, { status: 404 });
     }
 
-    // Scoring is recomputed server-side from the provided answer key.
+    // Scoring is recomputed server-side from the provided answer key / reference.
     const outcomes = answers.map((a) => ({
-      correct: isAnswerCorrect(a.correctIndices, a.selected),
+      correct:
+        a.format === "written"
+          ? isWrittenCorrect(gradeWritten(a.referenceAnswer ?? "", a.writtenAnswer ?? ""))
+          : isAnswerCorrect(a.correctIndices ?? [], a.selected ?? []),
       difficulty: difficulty as Difficulty,
     }));
     const correct = outcomes.filter((o) => o.correct).length;
@@ -83,9 +90,11 @@ export async function POST(req: Request): Promise<Response> {
         attempt_id: attempt.id,
         user_id: user.id,
         prompt: a.prompt,
-        selected_indices: a.selected,
-        correct_indices: a.correctIndices,
+        selected_indices: a.selected ?? [],
+        correct_indices: a.correctIndices ?? [],
         is_correct: outcomes[i].correct,
+        written_answer: a.writtenAnswer ?? null,
+        reference_answer: a.referenceAnswer ?? null,
       })),
     );
 

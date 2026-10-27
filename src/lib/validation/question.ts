@@ -96,3 +96,38 @@ export function toGeneratedMultiQuestion(
     explanation: multi.explanation,
   };
 }
+
+/** Written: an open prompt with a reference answer used for grading. */
+export const llmWrittenSchema = z.object({
+  prompt: z.string().min(1).max(1000),
+  referenceAnswer: z.string().min(1).max(2000),
+  explanation: z.string().min(1).max(2000),
+});
+
+export type LlmWritten = z.infer<typeof llmWrittenSchema>;
+
+export const llmWrittenListSchema = z.array(llmWrittenSchema).min(1).max(20);
+
+export function parseLlmWritten(raw: unknown): ParseResult<LlmWritten[]> {
+  const result = llmWrittenListSchema.safeParse(raw);
+  if (result.success) return { success: true, data: result.data };
+  return {
+    success: false,
+    error: result.error.issues
+      .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+      .join("; "),
+  };
+}
+
+export function toGeneratedWrittenQuestion(
+  written: LlmWritten,
+  difficulty: Difficulty,
+): GeneratedQuestion {
+  return {
+    difficulty,
+    format: "written",
+    prompt: written.prompt,
+    referenceAnswer: written.referenceAnswer,
+    explanation: written.explanation,
+  };
+}

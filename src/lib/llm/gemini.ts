@@ -19,8 +19,10 @@ import type {
 import {
   parseLlmMcqs,
   parseLlmMulti,
+  parseLlmWritten,
   toGeneratedMultiQuestion,
   toGeneratedQuestion,
+  toGeneratedWrittenQuestion,
 } from "@/lib/validation/question";
 
 type FetchFn = typeof fetch;
@@ -53,6 +55,19 @@ const MULTI_RESPONSE_SCHEMA = {
   },
 } as const;
 
+const WRITTEN_RESPONSE_SCHEMA = {
+  type: "ARRAY",
+  items: {
+    type: "OBJECT",
+    properties: {
+      prompt: { type: "STRING" },
+      referenceAnswer: { type: "STRING" },
+      explanation: { type: "STRING" },
+    },
+    required: ["prompt", "referenceAnswer", "explanation"],
+  },
+} as const;
+
 export class GeminiProvider implements LLMProvider {
   readonly id = "gemini";
 
@@ -75,6 +90,15 @@ export class GeminiProvider implements LLMProvider {
       const parsed = parseLlmMulti(raw);
       if (!parsed.success) throw new Error(`Gemini returned invalid multi output: ${parsed.error}`);
       return parsed.data.map((m) => toGeneratedMultiQuestion(m, input.difficulty));
+    }
+
+    if (format === "written") {
+      const prompt = `Generate ${input.count} short open-ended questions on ${context}. For each, give a concise referenceAnswer (1-3 sentences) a grader can match against.${avoid}`;
+      const raw = await this.generateJson(prompt, WRITTEN_RESPONSE_SCHEMA);
+      const parsed = parseLlmWritten(raw);
+      if (!parsed.success)
+        throw new Error(`Gemini returned invalid written output: ${parsed.error}`);
+      return parsed.data.map((w) => toGeneratedWrittenQuestion(w, input.difficulty));
     }
 
     const prompt = `Generate ${input.count} multiple-choice questions on ${context}. Each has exactly 4 options and one correct answer.${avoid}`;

@@ -12,7 +12,7 @@ const bodySchema = z.object({
   domain: z.string().min(1).max(100),
   difficulty: z.number().int().min(1).max(5),
   count: z.number().int().min(1).max(10).default(5),
-  format: z.enum(["mcq", "multi"]).default("mcq"),
+  format: z.enum(["mcq", "multi", "written"]).default("mcq"),
 });
 
 function clientKey(req: Request): string {

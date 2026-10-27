@@ -51,7 +51,8 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
   rolls up attempts/mastery/flashcards (migration `0004`)
 - ✅ 4C: Multi-select format (#11) — format picker on the quiz screen; checkbox UI; set-equality
   scoring; persists + makes flashcards like MCQ (no migration)
-- ⬜ 4D: Written (free-text) format (#11) — needs a small schema change + grading
+- ✅ 4D: Written (free-text) format (#11) — textarea UI; deterministic word-overlap grading
+  (`grade-written.ts`); persists written answers (migration `0005`); makes flashcards
 - ⬜ 80/20 prioritization (#7), foundational-gap detection (#12) — lightweight versions planned
 
 ## MVP features (sequenced across phases; none removed)
@@ -68,7 +69,7 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 | 8   | Holistic knowledge profile            | 2     | 🟨     | Per-domain mastery (X/10) on dashboard; verify live after migration + anon auth.          |
 | 9   | Progress dashboard & analytics        | 3     | ✅     | Stat tiles, accuracy-over-time chart, per-domain mastery + learning gains.                |
 | 10  | Cross-domain concept connections      | 5     | ⬜     | Analogy cards linking new concepts to familiar ones.                                      |
-| 11  | Multiple question formats             | 1 / 4 | 🟨     | MCQ ✅ + multi-select ✅; written (free-text) is 4D.                                      |
+| 11  | Multiple question formats             | 1 / 4 | ✅     | MCQ + multi-select + written (free-text, graded). Format picker on the quiz screen.       |
 | 12  | Foundational gap detection            | 4     | ⬜     | Detect weak prerequisites before advancing.                                               |
 | 13  | Baseline + long-term measurement      | 3     | 🟨     | Baseline→now gain per domain shown; richer retention (new Qs over time) later.            |
 | 14  | Progressive load management           | 4     | 🟨     | Recommended difficulty rises gradually with mastery/confidence; more to come.             |
