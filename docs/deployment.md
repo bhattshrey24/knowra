@@ -2,22 +2,21 @@
 
 Knowra deploys on **Vercel** using its native Git integration — every push is built and deployed
 automatically, with no deploy step in GitHub Actions. (CI in `.github/workflows/ci.yml` still runs
-lint/typecheck/tests/build on `main`, `dev`, and `prod` and on PRs to them.)
+lint/typecheck/tests/build on `main` and `dev` and on PRs to them.)
 
 ## Branch → environment model
 
 | Branch         | Vercel deployment                 | Use                                            |
 | -------------- | --------------------------------- | ---------------------------------------------- |
-| `prod`         | **Production** (your main domain) | Released, stable builds                        |
+| `main`         | **Production** (your main domain) | Released, stable builds                        |
 | `dev`          | **Preview**                       | Integration branch — the shared staging deploy |
-| `main`         | Preview                           | Retained trunk (optional in the deploy flow)   |
 | `feat/*` (PRs) | Preview (one URL per PR)          | Per-change previews, auto-commented on the PR  |
 
 Vercel treats the configured **Production Branch** specially and deploys every _other_ branch as a
-Preview. We set the Production Branch to **`prod`**, so `dev` (and feature branches) deploy as
+Preview. `main` is the Production Branch (Vercel's default), so `dev` and feature branches deploy as
 Previews automatically.
 
-**Release flow:** feature branch → PR into `dev` (preview) → merge → promote `dev` → `prod` (via a
+**Release flow:** feature branch → PR into `dev` (preview) → merge → promote `dev` → `main` (via a
 PR) to ship to Production.
 
 ## One-time setup (Vercel dashboard)
@@ -25,15 +24,15 @@ PR) to ship to Production.
 1. **Import the repo** — [vercel.com/new](https://vercel.com/new) → import `bhattshrey24/knowra`
    → authorize the Vercel GitHub app for this repo. Framework auto-detects as **Next.js**; keep
    the default build (`next build`) and output settings.
-2. **Set the Production Branch** — Project → **Settings → Git → Production Branch** → set to
-   **`prod`** → Save. (Now `dev` and feature branches deploy as Previews.)
+2. **Production Branch** — Project → **Settings → Git → Production Branch** → confirm it's
+   **`main`** (Vercel's default). `dev` and feature branches then deploy as Previews.
 3. **Add environment variables** — Project → **Settings → Environment Variables**. Add these for
    **Production _and_ Preview** (values from your Supabase project; never commit them):
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY` (secret — server only)
    - `LLM_PROVIDER` = `mock` for now (set to `gemini` + add `GOOGLE_GENERATIVE_AI_API_KEY` to use Gemini)
-4. **Redeploy** the latest `prod` and `dev` so they pick up the env vars (Deployments → ⋯ →
+4. **Redeploy** the latest `main` and `dev` so they pick up the env vars (Deployments → ⋯ →
    Redeploy), or just push.
 
 ## Notes

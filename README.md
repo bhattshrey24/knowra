@@ -53,7 +53,7 @@ tests/              unit · integration · e2e
 
 ## Deployment
 
-Hosted on Vercel via native Git integration: `prod` → Production, `dev` and feature branches →
+Hosted on Vercel via native Git integration: `main` → Production, `dev` and feature branches →
 Preview. Full setup and env vars in [docs/deployment.md](docs/deployment.md).
 
 See `CLAUDE.md` (conventions), `FEATURES.md` (feature status), `docs/design.md` (design),
