@@ -5,6 +5,26 @@ Newest first.
 
 ---
 
+## 2026-10-27 — Phase 3B: analytics dashboard (#9, #13)
+
+**Completed** (branch `feat/phase-3b-analytics`, test-first)
+
+- Pure analytics module (`analytics.ts`, unit-tested): `overallStats`, `accuracyTimeline`,
+  `domainGains` (baseline vs latest accuracy per domain = learning gain / retention signal, #13).
+- `AccuracyChart` — inline-SVG line/area, one brand hue (no legend/categorical palette to
+  validate), recessive grid, non-scaling strokes, hover crosshair + tooltip, and a `<details>`
+  table as the color-independent accessible view (per the dataviz skill).
+- Dashboard rebuilt: stat tiles (quizzes/answered/accuracy), accuracy-over-time chart, per-domain
+  mastery with baseline→now gain (▲/▼ + label, not color alone). No new migration — reads
+  existing `quiz_attempts`.
+- Verified offline: 46 unit/integration tests + 5 e2e (mock, incl. dashboard/flashcards empty
+  states) + build green.
+
+**Next**: Phase 4 — custom topic search (#2), difficulty recommendation (#3), 80/20 (#7),
+foundational-gap detection (#12), progressive load (#14), multi-select + written formats (#11).
+
+---
+
 ## 2026-10-27 — Phase 3A: spaced repetition (SM-2)
 
 **Completed** (branch `feat/phase-3-spaced-repetition`, test-first)

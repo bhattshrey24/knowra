@@ -39,7 +39,8 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 - ✅ Review flow: "Due for review" session with Again/Hard/Good/Easy → `POST /api/flashcards/review`
   reschedules each card (#6)
 - 🟨 Needs user action: apply `0003`
-- ⬜ Analytics dashboard (#9) + baseline/retention (#13) — next (3B)
+- ✅ Analytics dashboard (#9): stat tiles + accuracy-over-time chart (hover + table fallback) +
+  per-domain mastery with baseline→now learning gains (#13)
 
 ## MVP features (sequenced across phases; none removed)
 
@@ -53,11 +54,11 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 | 6   | Spaced repetition + reminders         | 3     | 🟨     | SM-2 review flow reschedules cards; verify live after `0003`. Reminders later.            |
 | 7   | 80/20 prioritization                  | 4     | ⬜     | Foundational/high-value concepts first.                                                   |
 | 8   | Holistic knowledge profile            | 2     | 🟨     | Per-domain mastery (X/10) on dashboard; verify live after migration + anon auth.          |
-| 9   | Progress dashboard & analytics        | 3     | ⬜     | Per-domain accuracy, mastery, gains, retention graphs.                                    |
+| 9   | Progress dashboard & analytics        | 3     | ✅     | Stat tiles, accuracy-over-time chart, per-domain mastery + learning gains.                |
 | 10  | Cross-domain concept connections      | 5     | ⬜     | Analogy cards linking new concepts to familiar ones.                                      |
 | 11  | Multiple question formats             | 1 / 4 | 🟨     | MCQ ✅; multi-select + written (LLM-graded) Phase 4.                                      |
 | 12  | Foundational gap detection            | 4     | ⬜     | Detect weak prerequisites before advancing.                                               |
-| 13  | Baseline + long-term measurement      | 3     | ⬜     | Baseline per topic; retention with new questions.                                         |
+| 13  | Baseline + long-term measurement      | 3     | 🟨     | Baseline→now gain per domain shown; richer retention (new Qs over time) later.            |
 | 14  | Progressive load management           | 4     | ⬜     | Complexity grows with mastery.                                                            |
 
 ## Outstanding / blocked

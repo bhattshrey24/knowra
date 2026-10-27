@@ -15,3 +15,10 @@ test("a subject opens the quiz start screen with difficulty selection", async ({
   await expect(page).toHaveURL(/\/quiz\/mathematics$/);
   await expect(page.getByRole("button", { name: "Start quiz" })).toBeVisible();
 });
+
+test("dashboard and flashcards render their empty states (no backend)", async ({ page }) => {
+  await page.goto("/dashboard");
+  await expect(page.getByText("No activity yet")).toBeVisible();
+  await page.goto("/flashcards");
+  await expect(page.getByText("No cards yet")).toBeVisible();
+});
