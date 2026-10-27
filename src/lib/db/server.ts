@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { WebSocket } from "ws";
 import { supabaseAnonKey, supabaseUrl } from "@/lib/env";
+
+// See src/lib/db/admin.ts: supply `ws` so supabase-js works on Node <22.
+const realtime = { transport: WebSocket as unknown as typeof globalThis.WebSocket };
 
 /**
  * Supabase client for Server Components, Route Handlers, and Server Actions.
@@ -11,6 +15,7 @@ export async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient(supabaseUrl(), supabaseAnonKey(), {
+    realtime,
     cookies: {
       getAll() {
         return cookieStore.getAll();

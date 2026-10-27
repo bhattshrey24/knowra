@@ -23,8 +23,11 @@ quality, debt, and upgrades.
 
 - **Dark mode toggle.** Theme tokens already support `.dark`; add `next-themes` + a toggle when UI
   polish time allows.
-- **Node runtime.** Project runs on Node 20.20. Vitest 5 / jsdom 30 want Node 22+. If CI uses Node
-  22, we could move back to latest Vitest/jsdom; keep local and CI Node versions aligned.
+- **Node runtime → 22.** Project runs on Node 20.20 (pinned by a `~/.local/bin/node` shim). Two
+  consequences: (1) Vitest 5 / jsdom 30 want Node 22+ (we pin v4/v26); (2) `@supabase/supabase-js`
+  needs a native `WebSocket` (Node 22+), so `src/lib/db/{server,admin}.ts` and
+  `scripts/check-supabase.mjs` supply `ws` as the realtime transport. Once the runtime is Node 22+
+  everywhere (local + CI; Vercel already is), drop the `ws` transport and consider latest Vitest.
 - **Rate limiting.** Add per-user rate limiting on LLM endpoints before any public exposure
   (protects the free-tier quota and prevents abuse).
 - **`shadcn` + `tw-animate-css` in `dependencies`.** The init placed these in `dependencies`;
