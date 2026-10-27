@@ -32,6 +32,15 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 - 🟨 Needs user action to verify live: apply `0002`, enable Anonymous sign-ins (attempts + mastery
   already verified live; take one more quiz to populate flashcards)
 
+## Phase 3 — Spaced repetition & analytics 🟨
+
+- ✅ Deterministic **SM-2** scheduling engine (`sm2.ts`) — unit-tested
+- ✅ Migration `0003`: scheduling columns on flashcards (reps, ease, interval, due_at)
+- ✅ Review flow: "Due for review" session with Again/Hard/Good/Easy → `POST /api/flashcards/review`
+  reschedules each card (#6)
+- 🟨 Needs user action: apply `0003`
+- ⬜ Analytics dashboard (#9) + baseline/retention (#13) — next (3B)
+
 ## MVP features (sequenced across phases; none removed)
 
 | #   | Feature                               | Phase | Status | Notes                                                                                     |
@@ -41,7 +50,7 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 | 3   | Adjustable difficulty 1–5 + recommend | 1 / 4 | 🟨     | Selection + used in generation ✅; auto-recommendation Phase 4.                           |
 | 4   | Weakness detection + flashcards       | 2     | 🟨     | Weakness (wrong) + foundational (right) cards, distinctly tagged; verify live via a quiz. |
 | 5   | AI learning assistant (chatbot)       | 6     | ⬜     | Optional; scoped to user's profile/mistakes.                                              |
-| 6   | Spaced repetition + reminders         | 3     | ⬜     | SM-2 scheduling; recall tested over time.                                                 |
+| 6   | Spaced repetition + reminders         | 3     | 🟨     | SM-2 review flow reschedules cards; verify live after `0003`. Reminders later.            |
 | 7   | 80/20 prioritization                  | 4     | ⬜     | Foundational/high-value concepts first.                                                   |
 | 8   | Holistic knowledge profile            | 2     | 🟨     | Per-domain mastery (X/10) on dashboard; verify live after migration + anon auth.          |
 | 9   | Progress dashboard & analytics        | 3     | ⬜     | Per-domain accuracy, mastery, gains, retention graphs.                                    |
