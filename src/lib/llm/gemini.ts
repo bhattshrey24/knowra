@@ -75,6 +75,7 @@ export class GeminiProvider implements LLMProvider {
     private readonly apiKey: string,
     private readonly model = "gemini-3.8-flash",
     private readonly fetchFn: FetchFn = fetch,
+    private readonly timeoutMs = 30_000,
   ) {}
 
   async generateQuestions(input: GenerateQuestionsInput): Promise<GeneratedQuestion[]> {
@@ -137,17 +138,18 @@ export class GeminiProvider implements LLMProvider {
     return text;
   }
 
-  /** Transient statuses worth retrying (overload / rate limit / server error). */
+  /** Quick, transient statuses worth a fast retry (overload / rate limit). */
   private static readonly RETRYABLE = new Set([429, 500, 503]);
-  /** Per-attempt timeout so a stalled connection can never hang the request. */
-  private static readonly TIMEOUT_MS = 25_000;
 
-  /** POST with a per-attempt timeout and exponential backoff on transient failures. */
-  private async postWithRetry(body: string, attempts = 3): Promise<Response> {
-    let lastError: unknown;
+  /**
+   * POST with a per-attempt timeout. Fast transient *status* rejections (503/429)
+   * are retried briefly; a *timeout/network* failure is NOT retried (a stalled
+   * request tends to stall again) — it throws fast so the caller can fall back.
+   */
+  private async postWithRetry(body: string, attempts = 2): Promise<Response> {
     for (let i = 0; i < attempts; i += 1) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), GeminiProvider.TIMEOUT_MS);
+      const timer = setTimeout(() => controller.abort(), this.timeoutMs);
       try {
         const res = await this.fetchFn(this.endpoint(), {
           method: "POST",
@@ -157,21 +159,19 @@ export class GeminiProvider implements LLMProvider {
         });
         if (res.ok || !GeminiProvider.RETRYABLE.has(res.status) || i === attempts - 1) return res;
       } catch (err) {
-        lastError = err;
-        if (i === attempts - 1) {
-          const aborted = (err as { name?: string })?.name === "AbortError";
-          throw new Error(
-            aborted
-              ? `Gemini request timed out after ${GeminiProvider.TIMEOUT_MS / 1000}s`
-              : `Gemini request failed: ${(err as Error)?.message ?? "network error"}`,
-          );
-        }
+        const aborted = (err as { name?: string })?.name === "AbortError";
+        throw new Error(
+          aborted
+            ? `Gemini request timed out after ${this.timeoutMs / 1000}s`
+            : `Gemini request failed: ${(err as Error)?.message ?? "network error"}`,
+        );
       } finally {
         clearTimeout(timer);
       }
-      await new Promise((resolve) => setTimeout(resolve, 300 * 2 ** i));
+      await new Promise((resolve) => setTimeout(resolve, 400));
     }
-    throw (lastError as Error) ?? new Error("Gemini request failed");
+    // Unreachable: the loop returns or throws.
+    throw new Error("Gemini request failed");
   }
 
   private async generateText(prompt: string): Promise<string> {
