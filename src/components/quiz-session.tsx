@@ -57,7 +57,8 @@ export function QuizSession({
   async function startQuiz() {
     setStatus("loading");
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 70_000);
+    // Comfortably above the server's ~30s LLM timeout + instant mock fallback.
+    const timer = setTimeout(() => controller.abort(), 45_000);
     try {
       const res = await fetch("/api/quiz", {
         method: "POST",
