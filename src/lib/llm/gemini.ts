@@ -73,8 +73,9 @@ export class GeminiProvider implements LLMProvider {
 
   constructor(
     private readonly apiKey: string,
-    private readonly model = "gemini-2.0-flash",
+    private readonly model = "gemini-flash-lite-latest",
     private readonly fetchFn: FetchFn = fetch,
+    private readonly timeoutMs = 30_000,
   ) {}
 
   async generateQuestions(input: GenerateQuestionsInput): Promise<GeneratedQuestion[]> {
@@ -137,25 +138,57 @@ export class GeminiProvider implements LLMProvider {
     return text;
   }
 
+  /** Quick, transient statuses worth a fast retry (overload / rate limit). */
+  private static readonly RETRYABLE = new Set([429, 500, 503]);
+
+  /**
+   * POST with a per-attempt timeout. Fast transient *status* rejections (503/429)
+   * are retried briefly; a *timeout/network* failure is NOT retried (a stalled
+   * request tends to stall again) — it throws fast so the caller can fall back.
+   */
+  private async postWithRetry(body: string, attempts = 2): Promise<Response> {
+    for (let i = 0; i < attempts; i += 1) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+      try {
+        const res = await this.fetchFn(this.endpoint(), {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body,
+          signal: controller.signal,
+        });
+        if (res.ok || !GeminiProvider.RETRYABLE.has(res.status) || i === attempts - 1) return res;
+      } catch (err) {
+        const aborted = (err as { name?: string })?.name === "AbortError";
+        throw new Error(
+          aborted
+            ? `Gemini request timed out after ${this.timeoutMs / 1000}s`
+            : `Gemini request failed: ${(err as Error)?.message ?? "network error"}`,
+        );
+      } finally {
+        clearTimeout(timer);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+    // Unreachable: the loop returns or throws.
+    throw new Error("Gemini request failed");
+  }
+
   private async generateText(prompt: string): Promise<string> {
-    const res = await this.fetchFn(this.endpoint(), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-    });
+    const res = await this.postWithRetry(
+      JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    );
     if (!res.ok) throw new Error(`Gemini request failed: ${res.status}`);
     return this.extractText(await res.json());
   }
 
   private async generateJson(prompt: string, responseSchema: unknown): Promise<unknown> {
-    const res = await this.fetchFn(this.endpoint(), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+    const res = await this.postWithRetry(
+      JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { responseMimeType: "application/json", responseSchema },
       }),
-    });
+    );
     if (!res.ok) throw new Error(`Gemini request failed: ${res.status}`);
     const text = this.extractText(await res.json());
     try {

@@ -26,6 +26,15 @@ const FORMATS: { value: QuizFormat; label: string; hint: string }[] = [
   { value: "written", label: "Written", hint: "Type your answer" },
 ];
 
+function FallbackNotice() {
+  return (
+    <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+      The AI was busy, so these are instant practice questions. Try again shortly for freshly
+      generated ones.
+    </p>
+  );
+}
+
 export function QuizSession({
   domainSlug,
   domainName,
@@ -43,18 +52,24 @@ export function QuizSession({
   const [answers, setAnswers] = useState<Record<string, number[]>>({});
   const [written, setWritten] = useState<Record<string, string>>({});
   const [summary, setSummary] = useState<QuizSummary | null>(null);
+  const [fallback, setFallback] = useState(false);
 
   async function startQuiz() {
     setStatus("loading");
+    const controller = new AbortController();
+    // Comfortably above the server's ~30s LLM timeout + instant mock fallback.
+    const timer = setTimeout(() => controller.abort(), 45_000);
     try {
       const res = await fetch("/api/quiz", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ domain: domainSlug, difficulty, count: 5, format }),
+        signal: controller.signal,
       });
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-      const data = (await res.json()) as { questions: Question[] };
+      const data = (await res.json()) as { questions: Question[]; fallback?: boolean };
       if (!data.questions?.length) throw new Error("No questions returned");
+      setFallback(Boolean(data.fallback));
       setQuestions(data.questions);
       setAnswers({});
       setWritten({});
@@ -62,6 +77,8 @@ export function QuizSession({
       setStatus("active");
     } catch {
       setStatus("error");
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -135,6 +152,7 @@ export function QuizSession({
     setAnswers({});
     setWritten({});
     setCurrent(0);
+    setFallback(false);
   }
 
   if (status === "setup" || status === "loading" || status === "error") {
@@ -224,6 +242,12 @@ export function QuizSession({
             "Start quiz"
           )}
         </Button>
+
+        {status === "loading" && (
+          <p className="text-muted-foreground text-xs">
+            Writing fresh questions with the AI — this usually takes a few seconds.
+          </p>
+        )}
       </div>
     );
   }
@@ -231,6 +255,7 @@ export function QuizSession({
   if (status === "results" && summary) {
     return (
       <div className="space-y-6">
+        {fallback && <FallbackNotice />}
         <div className="bg-accent text-accent-foreground rounded-xl border p-6 text-center">
           <p className="text-sm font-medium">You scored</p>
           <p className="mt-1 text-4xl font-semibold">{summary.percent}%</p>
@@ -320,6 +345,7 @@ export function QuizSession({
 
   return (
     <div className="space-y-6">
+      {fallback && <FallbackNotice />}
       <div className="space-y-2">
         <div className="text-muted-foreground flex items-center justify-between text-xs">
           <span>

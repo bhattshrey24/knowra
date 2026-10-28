@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getLLMProvider } from "@/lib/llm";
+import { MockLLMProvider } from "@/lib/llm/mock";
 import { resolveLearnable } from "@/lib/db/learnable-server";
 import { rateLimit } from "@/lib/rate-limit";
 import type { Difficulty, Question } from "@/types/learning";
@@ -51,18 +52,35 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const provider = getLLMProvider();
+  const genInput = {
+    conceptName: learnable.name,
+    topicName: learnable.name,
+    domainName: learnable.name,
+    difficulty: difficulty as Difficulty,
+    formats: [format],
+    count,
+  };
+
   let generated;
+  let usedProvider = provider.id;
+  let fallback = false;
   try {
-    generated = await provider.generateQuestions({
-      conceptName: learnable.name,
-      topicName: learnable.name,
-      domainName: learnable.name,
-      difficulty: difficulty as Difficulty,
-      formats: [format],
-      count,
-    });
-  } catch {
-    return NextResponse.json({ error: "Failed to generate questions" }, { status: 502 });
+    generated = await provider.generateQuestions(genInput);
+  } catch (err) {
+    // Server log (no secrets in these messages) so the cause is visible in logs.
+    console.error(`[quiz] generation failed (provider=${provider.id}):`, (err as Error)?.message);
+    if (provider.id === "mock") {
+      return NextResponse.json({ error: "Failed to generate questions" }, { status: 502 });
+    }
+    // Graceful fallback: a flaky LLM shouldn't dead-end the quiz. Serve instant
+    // practice questions, clearly flagged so the UI can tell the learner.
+    try {
+      generated = await new MockLLMProvider().generateQuestions(genInput);
+      usedProvider = "mock-fallback";
+      fallback = true;
+    } catch {
+      return NextResponse.json({ error: "Failed to generate questions" }, { status: 502 });
+    }
   }
 
   const questions: Question[] = generated.map((g) => ({
@@ -74,7 +92,8 @@ export async function POST(req: Request): Promise<Response> {
   return NextResponse.json({
     domain: learnable.slug,
     difficulty,
-    provider: provider.id,
+    provider: usedProvider,
+    fallback,
     questions,
   });
 }
