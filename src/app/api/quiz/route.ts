@@ -61,8 +61,13 @@ export async function POST(req: Request): Promise<Response> {
       formats: [format],
       count,
     });
-  } catch {
-    return NextResponse.json({ error: "Failed to generate questions" }, { status: 502 });
+  } catch (err) {
+    // Server log (no secrets in these messages) so the cause is visible in dev/Vercel logs.
+    console.error(`[quiz] generation failed (provider=${provider.id}):`, (err as Error)?.message);
+    return NextResponse.json(
+      { error: "Failed to generate questions", detail: (err as Error)?.message },
+      { status: 502 },
+    );
   }
 
   const questions: Question[] = generated.map((g) => ({

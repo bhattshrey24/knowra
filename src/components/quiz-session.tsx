@@ -46,11 +46,14 @@ export function QuizSession({
 
   async function startQuiz() {
     setStatus("loading");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 70_000);
     try {
       const res = await fetch("/api/quiz", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ domain: domainSlug, difficulty, count: 5, format }),
+        signal: controller.signal,
       });
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       const data = (await res.json()) as { questions: Question[] };
@@ -62,6 +65,8 @@ export function QuizSession({
       setStatus("active");
     } catch {
       setStatus("error");
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -224,6 +229,12 @@ export function QuizSession({
             "Start quiz"
           )}
         </Button>
+
+        {status === "loading" && (
+          <p className="text-muted-foreground text-xs">
+            Writing fresh questions with the AI — this usually takes a few seconds.
+          </p>
+        )}
       </div>
     );
   }
