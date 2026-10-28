@@ -73,7 +73,7 @@ export class GeminiProvider implements LLMProvider {
 
   constructor(
     private readonly apiKey: string,
-    private readonly model = "gemini-3.8-flash",
+    private readonly model = "gemini-flash-lite-latest",
     private readonly fetchFn: FetchFn = fetch,
     private readonly timeoutMs = 30_000,
   ) {}
