@@ -137,25 +137,39 @@ export class GeminiProvider implements LLMProvider {
     return text;
   }
 
+  /** Transient statuses worth retrying (overload / rate limit / server error). */
+  private static readonly RETRYABLE = new Set([429, 500, 503]);
+
+  /** POST with small exponential backoff on transient failures. */
+  private async postWithRetry(body: string, attempts = 3): Promise<Response> {
+    let res!: Response;
+    for (let i = 0; i < attempts; i += 1) {
+      res = await this.fetchFn(this.endpoint(), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      });
+      if (res.ok || !GeminiProvider.RETRYABLE.has(res.status) || i === attempts - 1) return res;
+      await new Promise((resolve) => setTimeout(resolve, 300 * 2 ** i));
+    }
+    return res;
+  }
+
   private async generateText(prompt: string): Promise<string> {
-    const res = await this.fetchFn(this.endpoint(), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-    });
+    const res = await this.postWithRetry(
+      JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    );
     if (!res.ok) throw new Error(`Gemini request failed: ${res.status}`);
     return this.extractText(await res.json());
   }
 
   private async generateJson(prompt: string, responseSchema: unknown): Promise<unknown> {
-    const res = await this.fetchFn(this.endpoint(), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+    const res = await this.postWithRetry(
+      JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { responseMimeType: "application/json", responseSchema },
       }),
-    });
+    );
     if (!res.ok) throw new Error(`Gemini request failed: ${res.status}`);
     const text = this.extractText(await res.json());
     try {

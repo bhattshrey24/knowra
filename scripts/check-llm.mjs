@@ -40,27 +40,37 @@ console.log(`\n→ Requesting ${model} (timeout ${TIMEOUT_MS / 1000}s)…`);
 const controller = new AbortController();
 const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-try {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    signal: controller.signal,
-    body: JSON.stringify({
-      contents: [
+const requestBody = JSON.stringify({
+  contents: [
+    {
+      parts: [
         {
-          parts: [
-            {
-              text: "Generate 2 multiple-choice questions on basic arithmetic. Each has exactly 4 options and one correct answer.",
-            },
-          ],
+          text: "Generate 2 multiple-choice questions on basic arithmetic. Each has exactly 4 options and one correct answer.",
         },
       ],
-      generationConfig: { responseMimeType: "application/json", responseSchema },
-    }),
-  });
+    },
+  ],
+  generationConfig: { responseMimeType: "application/json", responseSchema },
+});
 
-  console.log(`← HTTP ${res.status}`);
-  const bodyText = await res.text();
+try {
+  let res;
+  let bodyText = "";
+  const retryable = new Set([429, 500, 503]);
+  for (let i = 0; i < 3; i += 1) {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      signal: controller.signal,
+      body: requestBody,
+    });
+    console.log(`← HTTP ${res.status}${i > 0 ? ` (attempt ${i + 1})` : ""}`);
+    bodyText = await res.text();
+    if (res.ok || !retryable.has(res.status) || i === 2) break;
+    const waitMs = 800 * 2 ** i;
+    console.log(`  transient ${res.status}; retrying in ${waitMs / 1000}s…`);
+    await new Promise((r) => setTimeout(r, waitMs));
+  }
 
   if (!res.ok) {
     console.error(`\n✗ Gemini error: ${bodyText.slice(0, 500)}`);
