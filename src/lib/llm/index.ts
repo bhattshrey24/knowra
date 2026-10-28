@@ -19,7 +19,8 @@ export function getLLMProvider(): LLMProvider {
   const geminiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? "";
 
   if (provider === "gemini" && !PLACEHOLDER_KEYS.has(geminiKey)) {
-    return new GeminiProvider(geminiKey);
+    // Optional GEMINI_MODEL override; the provider's default is used when unset.
+    return new GeminiProvider(geminiKey, process.env.GEMINI_MODEL || undefined);
   }
   return new MockLLMProvider();
 }
