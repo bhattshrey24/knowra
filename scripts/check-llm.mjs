@@ -7,7 +7,7 @@
 // (Set LLM_PROVIDER=gemini and GOOGLE_GENERATIVE_AI_API_KEY in .env.local first.)
 
 const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 
 if (!key || key === "your-gemini-key") {
   console.error("✗ GOOGLE_GENERATIVE_AI_API_KEY is not set in .env.local.");
