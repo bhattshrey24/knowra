@@ -57,8 +57,9 @@ export function QuizSession({
   async function startQuiz() {
     setStatus("loading");
     const controller = new AbortController();
-    // Comfortably above the server's ~30s LLM timeout + instant mock fallback.
-    const timer = setTimeout(() => controller.abort(), 45_000);
+    // Above the server LLM timeout (Gemini ~30s, local Ollama up to 60s) so the
+    // server's mock fallback resolves before the client aborts.
+    const timer = setTimeout(() => controller.abort(), 65_000);
     try {
       const res = await fetch("/api/quiz", {
         method: "POST",
@@ -245,7 +246,8 @@ export function QuizSession({
 
         {status === "loading" && (
           <p className="text-muted-foreground text-xs">
-            Writing fresh questions with the AI — this usually takes a few seconds.
+            Writing fresh questions with the AI — a few seconds on a hosted model, longer on a local
+            one.
           </p>
         )}
       </div>
