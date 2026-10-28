@@ -78,7 +78,7 @@ export class OllamaProvider implements LLMProvider {
     private readonly baseUrl = "http://localhost:11434",
     private readonly model = "llama3.2",
     private readonly fetchFn: FetchFn = fetch,
-    private readonly timeoutMs = 40_000,
+    private readonly timeoutMs = 60_000,
   ) {}
 
   async generateQuestions(input: GenerateQuestionsInput): Promise<GeneratedQuestion[]> {
