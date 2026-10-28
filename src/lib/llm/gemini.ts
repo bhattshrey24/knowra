@@ -139,20 +139,39 @@ export class GeminiProvider implements LLMProvider {
 
   /** Transient statuses worth retrying (overload / rate limit / server error). */
   private static readonly RETRYABLE = new Set([429, 500, 503]);
+  /** Per-attempt timeout so a stalled connection can never hang the request. */
+  private static readonly TIMEOUT_MS = 25_000;
 
-  /** POST with small exponential backoff on transient failures. */
+  /** POST with a per-attempt timeout and exponential backoff on transient failures. */
   private async postWithRetry(body: string, attempts = 3): Promise<Response> {
-    let res!: Response;
+    let lastError: unknown;
     for (let i = 0; i < attempts; i += 1) {
-      res = await this.fetchFn(this.endpoint(), {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body,
-      });
-      if (res.ok || !GeminiProvider.RETRYABLE.has(res.status) || i === attempts - 1) return res;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), GeminiProvider.TIMEOUT_MS);
+      try {
+        const res = await this.fetchFn(this.endpoint(), {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body,
+          signal: controller.signal,
+        });
+        if (res.ok || !GeminiProvider.RETRYABLE.has(res.status) || i === attempts - 1) return res;
+      } catch (err) {
+        lastError = err;
+        if (i === attempts - 1) {
+          const aborted = (err as { name?: string })?.name === "AbortError";
+          throw new Error(
+            aborted
+              ? `Gemini request timed out after ${GeminiProvider.TIMEOUT_MS / 1000}s`
+              : `Gemini request failed: ${(err as Error)?.message ?? "network error"}`,
+          );
+        }
+      } finally {
+        clearTimeout(timer);
+      }
       await new Promise((resolve) => setTimeout(resolve, 300 * 2 ** i));
     }
-    return res;
+    throw (lastError as Error) ?? new Error("Gemini request failed");
   }
 
   private async generateText(prompt: string): Promise<string> {
