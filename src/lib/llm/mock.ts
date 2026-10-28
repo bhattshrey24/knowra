@@ -20,7 +20,7 @@ export class MockLLMProvider implements LLMProvider {
   readonly id = "mock";
 
   async generateQuestions(input: GenerateQuestionsInput): Promise<GeneratedQuestion[]> {
-    const count = Math.max(1, Math.min(input.count, 20));
+    const count = Math.max(1, Math.min(input.count, 30));
     const format = input.formats[0] ?? "mcq";
     return Array.from({ length: count }, (_, i) => {
       const options = Array.from({ length: 4 }, (_, j) => `${input.conceptName} — choice ${j + 1}`);
