@@ -61,7 +61,28 @@ describe("GeminiProvider.generateQuestions", () => {
   });
 
   it("throws on a failed HTTP response", async () => {
-    const provider = new GeminiProvider("test-key", "gemini-2.0-flash", fakeFetch("", false, 429));
-    await expect(provider.generateQuestions(input)).rejects.toThrow(/429/);
+    const provider = new GeminiProvider("test-key", "gemini-3.8-flash", fakeFetch("", false, 503));
+    await expect(provider.generateQuestions(input)).rejects.toThrow(/503/);
+  });
+
+  it("retries a transient 503 and succeeds", async () => {
+    let calls = 0;
+    const flaky = (async () => {
+      calls += 1;
+      if (calls === 1)
+        return { ok: false, status: 503, json: async () => ({}) } as unknown as Response;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: JSON.stringify(validMcq) }] } }],
+        }),
+      } as unknown as Response;
+    }) as typeof fetch;
+
+    const provider = new GeminiProvider("test-key", "gemini-3.8-flash", flaky);
+    const questions = await provider.generateQuestions(input);
+    expect(calls).toBe(2); // first failed, retry succeeded
+    expect(questions).toHaveLength(1);
   });
 });
