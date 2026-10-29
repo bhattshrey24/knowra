@@ -33,6 +33,19 @@ describe("parseLlmMcqs (untrusted LLM output)", () => {
     expect(parseLlmMcqs({ prompt: "x" }).success).toBe(false);
     expect(parseLlmMcqs(null).success).toBe(false);
   });
+
+  it("keeps valid questions and drops the odd malformed one", () => {
+    const result = parseLlmMcqs([
+      validRaw[0],
+      { ...validRaw[0], correctIndex: 9 }, // out of range → dropped
+      { ...validRaw[0], prompt: "What is 3 + 3?" },
+    ]);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toHaveLength(2);
+      expect(result.data.map((q) => q.prompt)).toEqual(["What is 2 + 2?", "What is 3 + 3?"]);
+    }
+  });
 });
 
 describe("toGeneratedQuestion", () => {
