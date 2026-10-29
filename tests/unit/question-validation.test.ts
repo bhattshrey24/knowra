@@ -34,6 +34,29 @@ describe("parseLlmMcqs (untrusted LLM output)", () => {
     expect(parseLlmMcqs(null).success).toBe(false);
   });
 
+  it("rejects generic titles and prompt leakage / JSON syntax in options", () => {
+    // Generic title as prompt
+    expect(
+      parseLlmMcqs([{ ...validRaw[0], prompt: "Multiple Choice Questions on Mathematics" }])
+        .success,
+    ).toBe(false);
+
+    // Option with raw JSON delimiter artifact
+    expect(
+      parseLlmMcqs([{ ...validRaw[0], options: ["3", "4", "5", "],"] }]).success,
+    ).toBe(false);
+
+    // Option leaking schema / internal fields
+    expect(
+      parseLlmMcqs([
+        {
+          ...validRaw[0],
+          options: ["3", "4", "Concepts: Circles", "What is the correctIndex of the answer?"],
+        },
+      ]).success,
+    ).toBe(false);
+  });
+
   it("keeps valid questions and drops the odd malformed one", () => {
     const result = parseLlmMcqs([
       validRaw[0],

@@ -8,6 +8,24 @@ import { z } from "zod";
 import type { Difficulty } from "@/types/learning";
 import type { GeneratedQuestion } from "@/lib/llm/provider";
 
+const GENERIC_HEADING_REGEX =
+  /^(multiple[- ]choice questions?|questions?|quiz|practice questions?) (on|about|for|of)\b/i;
+const JSON_SYNTAX_LEAK_REGEX = /^[\]\},\[\{"'\s]+$/;
+
+function isValidPromptText(prompt: string): boolean {
+  return !GENERIC_HEADING_REGEX.test(prompt.trim());
+}
+
+function areValidOptions(options: string[]): boolean {
+  return options.every((opt) => {
+    const trimmed = opt.trim();
+    if (JSON_SYNTAX_LEAK_REGEX.test(trimmed)) return false;
+    const lower = trimmed.toLowerCase();
+    if (lower.includes("correctindex") || lower.startsWith("concepts:")) return false;
+    return true;
+  });
+}
+
 /** The raw shape a provider is asked to return for a multiple-choice question. */
 export const llmMcqSchema = z
   .object({
@@ -21,6 +39,14 @@ export const llmMcqSchema = z
   .refine((q) => q.correctIndex < q.options.length, {
     message: "correctIndex is outside the options range",
     path: ["correctIndex"],
+  })
+  .refine((q) => isValidPromptText(q.prompt), {
+    message: "prompt looks like a generic title rather than a question",
+    path: ["prompt"],
+  })
+  .refine((q) => areValidOptions(q.options), {
+    message: "options contain prompt leakage or JSON syntax noise",
+    path: ["options"],
   });
 
 export type LlmMcq = z.infer<typeof llmMcqSchema>;
@@ -83,6 +109,14 @@ export const llmMultiSchema = z
   .refine((q) => new Set(q.correctIndices).size === q.correctIndices.length, {
     message: "correctIndices must be distinct",
     path: ["correctIndices"],
+  })
+  .refine((q) => isValidPromptText(q.prompt), {
+    message: "prompt looks like a generic title rather than a question",
+    path: ["prompt"],
+  })
+  .refine((q) => areValidOptions(q.options), {
+    message: "options contain prompt leakage or JSON syntax noise",
+    path: ["options"],
   });
 
 export type LlmMulti = z.infer<typeof llmMultiSchema>;

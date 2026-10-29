@@ -42,7 +42,7 @@ const MCQ_SCHEMA = {
     type: "object",
     properties: {
       prompt: STRING,
-      options: { type: "array", items: STRING },
+      options: { type: "array", items: STRING, minItems: 4, maxItems: 4 },
       correctIndex: { type: "integer" },
       explanation: STRING,
       concept: STRING,
@@ -56,7 +56,7 @@ const MULTI_SCHEMA = {
     type: "object",
     properties: {
       prompt: STRING,
-      options: { type: "array", items: STRING },
+      options: { type: "array", items: STRING, minItems: 4, maxItems: 4 },
       correctIndices: { type: "array", items: { type: "integer" } },
       explanation: STRING,
       concept: STRING,
@@ -111,7 +111,7 @@ export class OllamaProvider implements LLMProvider {
 
     if (format === "multi") {
       const raw = await this.chatJson(
-        `Generate ${input.count} multiple-select questions on ${context}. Each has 4 options and one OR MORE correct answers (correctIndices).${conceptClause(input)} Respond as a JSON array.`,
+        `Generate ${input.count} multiple-select questions on ${context}.${conceptClause(input)} Each question must have exactly 4 options and one or more correct answers (correctIndices). "prompt" must be the question itself. Respond as a JSON array.`,
         MULTI_SCHEMA,
       );
       const parsed = parseLlmMulti(raw);
@@ -120,7 +120,7 @@ export class OllamaProvider implements LLMProvider {
     }
 
     const raw = await this.chatJson(
-      `Generate ${input.count} multiple-choice questions on ${context}. Each has exactly 4 options and one correct answer (correctIndex).${conceptClause(input)} Respond as a JSON array.`,
+      `Generate ${input.count} multiple-choice questions on ${context}.${conceptClause(input)} Each question must have exactly 4 options and one correct answer (correctIndex). "prompt" must be the actual question itself (never a title like "Multiple Choice Questions"). Respond as a JSON array.`,
       MCQ_SCHEMA,
     );
     const parsed = parseLlmMcqs(raw);
@@ -205,11 +205,21 @@ export class OllamaProvider implements LLMProvider {
     return this.extractContent(await res.json());
   }
 
-  private async chatJson(prompt: string, format: unknown): Promise<unknown> {
+  private readonly systemPrompt =
+    "You are an educational quiz generator. Always produce valid JSON matching the schema. The 'prompt' field must be the actual question text itself. 'options' must contain exactly 4 plausible choices. Never include titles, concept tags, or JSON syntax inside options.";
+
+  private async chatJson(
+    prompt: string,
+    format: unknown,
+    systemPrompt = this.systemPrompt,
+  ): Promise<unknown> {
     const res = await this.post(
       JSON.stringify({
         model: this.model,
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt },
+        ],
         stream: false,
         format,
         options: { temperature: 0.6 },
