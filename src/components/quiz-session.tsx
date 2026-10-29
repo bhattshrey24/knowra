@@ -138,6 +138,7 @@ export function QuizSession({
         difficulty,
         answers: questions.map((q) => ({
           prompt: q.prompt,
+          conceptId: q.conceptId,
           format: q.format,
           options: q.options ?? [],
           selected: answers[q.id] ?? [],

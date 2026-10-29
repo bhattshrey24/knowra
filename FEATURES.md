@@ -85,10 +85,16 @@ validates every taxonomy relationship, question structure, answer key, and diffi
   question carries a real `conceptId`. Custom topics keep their own slug until 6.3 classifies them.
   Verified: 124 unit/integration tests + build. (Quizzing *at* topic/concept level and concept-level
   mastery tracking are 6.2.)_
-- ⬜ **6.2 Quizzing & revision at all three levels:** Let users quiz at subject, topic, or concept
+- 🟨 **6.2 Quizzing & revision at all three levels:** Let users quiz at subject, topic, or concept
   level. Track results at the concept level and aggregate up into topic- and subject-level stats
   for dashboards, flashcards, and revision. Subject-level quizzes **balance** weak concepts,
-  unassessed concepts, and previously mastered concepts due for a retention check.
+  unassessed concepts, and previously mastered concepts due for a retention check. _Landed:
+  quizzing at any level (scope-aware generation, from the homepage step); concept-level mastery
+  tracking — deterministic `foldConceptMastery` + `aggregateByLevel` (concept→topic→subject),
+  unit-tested; migration `0008` (`concept_mastery` + `attempt_answers.concept_id`); `/api/attempts`
+  records each tagged answer's outcome and updates concept mastery. Next: aggregate into the
+  dashboard/flashcards, balanced subject-quiz selection, and a min-evidence gate before calling a
+  concept weak/mastered._
 - ⬜ **6.3 Search & create:** Homepage search bar over existing subjects/topics/concepts. If no
   match, the user describes what they want to learn; the LLM proposes a classification, checks for
   duplicates and valid relationships, and the user can correct it before saving.
