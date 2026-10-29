@@ -7,8 +7,9 @@ import { MockLLMProvider } from "@/lib/llm/mock";
 import { resolveLearnable } from "@/lib/db/learnable-server";
 import { allocateFormatCounts, interleaveByFormat } from "@/lib/learning/quiz-composition";
 import { getTaxonomy } from "@/lib/db/taxonomy-server";
-import { conceptsForScope } from "@/lib/learning/taxonomy";
+import { conceptsForScope, subjectsOfConcept } from "@/lib/learning/taxonomy";
 import { assignConceptIds, type AllowedConcept } from "@/lib/learning/concept-tagging";
+import type { TaxonomyLevel } from "@/types/learning";
 import { rateLimit } from "@/lib/rate-limit";
 import type { Difficulty, Question, QuestionFormat } from "@/types/learning";
 
@@ -26,6 +27,11 @@ const bodySchema = z.object({
     .max(3)
     .optional(),
   format: z.enum(["mcq", "multi", "written"]).optional(),
+  // Optional narrower scope within the subject (Phase 6.1 navigation): quiz a
+  // single topic or concept. Ignored if it doesn't belong to `domain`.
+  scope: z
+    .object({ level: z.enum(["topic", "concept"]), id: z.string().min(1).max(100) })
+    .optional(),
 });
 
 type GenInput = {
@@ -37,11 +43,29 @@ type GenInput = {
   concepts?: AllowedConcept[];
 };
 
-/** The taxonomy concepts a subject-scoped quiz draws from (empty for custom topics). */
-async function conceptsForSubject(slug: string): Promise<AllowedConcept[]> {
+/**
+ * The taxonomy concepts a quiz draws from. Defaults to every concept under the
+ * subject; narrows to a single topic or concept when a valid in-subject scope
+ * is given. Empty for custom topics (not in the taxonomy).
+ */
+async function conceptsForQuiz(
+  subjectSlug: string,
+  scope?: { level: "topic" | "concept"; id: string },
+): Promise<AllowedConcept[]> {
   const tax = await getTaxonomy();
-  return conceptsForScope(tax, "subject", slug)
-    .map((id) => tax.conceptById.get(id))
+
+  let level: TaxonomyLevel = "subject";
+  let id = subjectSlug;
+  if (scope?.level === "topic" && tax.topicById.get(scope.id)?.subjectId === subjectSlug) {
+    level = "topic";
+    id = scope.id;
+  } else if (scope?.level === "concept" && subjectsOfConcept(tax, scope.id).includes(subjectSlug)) {
+    level = "concept";
+    id = scope.id;
+  }
+
+  return conceptsForScope(tax, level, id)
+    .map((cid) => tax.conceptById.get(cid))
     .filter((c): c is NonNullable<typeof c> => Boolean(c))
     .map((c) => ({ id: c.id, name: c.name }));
 }
@@ -95,7 +119,7 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  const { domain, difficulty, count } = parsed.data;
+  const { domain, difficulty, count, scope } = parsed.data;
   // Prefer the array; fall back to the legacy singular field, then default mcq.
   const formats: QuestionFormat[] = parsed.data.formats ?? [parsed.data.format ?? "mcq"];
   const learnable = await resolveLearnable(domain);
@@ -103,10 +127,10 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: "Unknown topic" }, { status: 404 });
   }
 
-  // Scope a predefined subject to its taxonomy concepts so every question maps
-  // to one (Phase 6.1). Custom topics aren't in the taxonomy — they keep their
-  // own slug as the concept id.
-  const allowedConcepts = learnable.isCustom ? [] : await conceptsForSubject(learnable.slug);
+  // Scope a predefined subject (optionally narrowed to a topic/concept) to its
+  // taxonomy concepts so every question maps to one (Phase 6.1). Custom topics
+  // aren't in the taxonomy — they keep their own slug as the concept id.
+  const allowedConcepts = learnable.isCustom ? [] : await conceptsForQuiz(learnable.slug, scope);
 
   const provider = getLLMProvider();
   const genInput: GenInput = {

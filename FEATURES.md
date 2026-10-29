@@ -108,6 +108,16 @@ validates every taxonomy relationship, question structure, answer key, and diffi
   Derive topic-/subject-level insight from concept-level evidence. **Never** mark a concept
   weak/mastered from a single response.
 
+- 🟨 **6.x Homepage & catalogue (supports 6.2/6.3):** Redesigned `/home` around the taxonomy — a
+  prominent search bar ("Search any subject, topic or concept…") with "Try:" examples and live
+  closest-match suggestions (`taxonomy/catalogue.ts`, unit-tested ranking); an Explore-the-catalogue
+  Subjects/Topics/Concepts tab view where topic cards show their subject and concept cards show
+  their topic + subject; and a Continue-learning section (recent subjects with progress + cards due
+  for revision from real data, with an empty state for new users). Clicking a topic/concept routes
+  to a scope-aware quiz (`?topic=`/`?concept=`) — `/api/quiz` accepts an in-subject scope and tags
+  every question accordingly, reusing 6.1's concept resolution. _Still 6.2/6.3: concept-level
+  mastery tracking + aggregation + subject-quiz balancing, and LLM-classified create-on-no-match._
+
 > **Important:** Consistent taxonomy and concept tagging are essential across quizzes, flashcards,
 > revision, learner profiles, and dashboards. Support concepts related to multiple topics/subjects
 > without duplication. The LLM proposes classifications and generates questions; **application

@@ -45,14 +45,19 @@ function FallbackNotice() {
   );
 }
 
+/** A narrower topic/concept scope within the subject (Phase 6.1 navigation). */
+export type QuizScope = { level: "topic" | "concept"; id: string; name: string };
+
 export function QuizSession({
   domainSlug,
   domainName,
   recommendedDifficulty,
+  scope,
 }: {
   domainSlug: string;
   domainName: string;
   recommendedDifficulty?: Difficulty;
+  scope?: QuizScope;
 }) {
   const [status, setStatus] = useState<Status>("setup");
   const [difficulty, setDifficulty] = useState<Difficulty>(recommendedDifficulty ?? 3);
@@ -85,7 +90,13 @@ export function QuizSession({
       const res = await fetch("/api/quiz", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ domain: domainSlug, difficulty, count, formats }),
+        body: JSON.stringify({
+          domain: domainSlug,
+          difficulty,
+          count,
+          formats,
+          scope: scope ? { level: scope.level, id: scope.id } : undefined,
+        }),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
