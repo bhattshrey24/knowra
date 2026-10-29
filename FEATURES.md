@@ -65,6 +65,50 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 - ⏸️ 5B: RAG / pgvector semantic retrieval — **deliberately deferred** (small corpus, embeddings
   cost); #10 is delivered via 5A. Design documented in `improve.md`.
 
+## Phase 6 — Concept-level taxonomy & adaptive mastery ⬜ (next — build step by step)
+
+Deepens the model from flat subjects to a `Subject → Topic → Concept` taxonomy so mastery,
+quizzing, and revision operate at the concept level. Extends the concept-level "later" notes on
+#2, #3, #7, #8, #12, #13, #14 — the LLM proposes classifications and questions; application logic
+validates every taxonomy relationship, question structure, answer key, and difficulty tag.
+
+- 🟨 **6.1 Hierarchy:** Model `Subject → Topic → Concept`. Every generated question is mapped to its
+  underlying concept, regardless of whether the user takes a subject-, topic-, or concept-level
+  quiz. Concepts may relate to multiple topics/subjects **without duplication** (shared concept,
+  many links). _Landed: deterministic taxonomy engine (`src/lib/learning/taxonomy.ts`, unit-tested
+  — validation + scope→concepts resolution), seed catalog (`src/lib/taxonomy/seed.ts`), shared-
+  taxonomy schema (migration `0007`, service-role writes / authenticated read). Next: load the seed
+  into the DB and tag generated questions with their concept._
+- ⬜ **6.2 Quizzing & revision at all three levels:** Let users quiz at subject, topic, or concept
+  level. Track results at the concept level and aggregate up into topic- and subject-level stats
+  for dashboards, flashcards, and revision. Subject-level quizzes **balance** weak concepts,
+  unassessed concepts, and previously mastered concepts due for a retention check.
+- ⬜ **6.3 Search & create:** Homepage search bar over existing subjects/topics/concepts. If no
+  match, the user describes what they want to learn; the LLM proposes a classification, checks for
+  duplicates and valid relationships, and the user can correct it before saving.
+- ⬜ **6.4 Initial taxonomy seed:** Seed the DB with a diverse, reasonably comprehensive set of
+  subjects, topics, and concepts. The taxonomy expands as users explore new areas, **without
+  creating duplicate entries**.
+- ⬜ **6.5 Adaptive diagnostics:** When a user picks an area with insufficient history, offer a
+  short adaptive diagnostic to estimate concept-level mastery. Users may skip and start learning;
+  mastery stays **uncertain** until there's enough evidence. Reuse reliable existing performance
+  data rather than re-assessing.
+- ⬜ **6.6 Difficulty calibration:** Separate **question difficulty** from **user mastery**.
+  Difficulty 1–5 with consistent, concept-calibrated guidelines (concept + reasoning required).
+  Recommend difficulty from diagnostics, mastery estimates, recent performance, and learning
+  goals; adaptive difficulty is the **default**, user can still choose their own.
+- ⬜ **6.7 Learner profile:** Continuously update concept-level mastery and weaknesses from quiz
+  attempts, accuracy, question difficulty, timestamps, and retention results where available.
+  Derive topic-/subject-level insight from concept-level evidence. **Never** mark a concept
+  weak/mastered from a single response.
+
+> **Important:** Consistent taxonomy and concept tagging are essential across quizzes, flashcards,
+> revision, learner profiles, and dashboards. Support concepts related to multiple topics/subjects
+> without duplication. The LLM proposes classifications and generates questions; **application
+> logic validates** taxonomy relationships, question structure, answer keys, and difficulty
+> metadata. Keep all of this in the deterministic engine per the golden rules — the LLM never owns
+> taxonomy or scoring.
+
 ## MVP features (sequenced across phases; none removed)
 
 | #   | Feature                               | Phase | Status | Notes                                                                                         |

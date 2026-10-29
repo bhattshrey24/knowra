@@ -23,28 +23,49 @@ export interface Domain {
   icon: string;
 }
 
-/** A topic within a domain, e.g. "Trigonometry" within Mathematics. */
+/**
+ * A level in the shared Subject → Topic → Concept taxonomy (Phase 6.1). A quiz
+ * can be scoped to any level; results are always tracked at the concept level
+ * and aggregated upward.
+ */
+export type TaxonomyLevel = "subject" | "topic" | "concept";
+
+/**
+ * The top of the taxonomy, e.g. Mathematics. `id` is a stable slug; for the
+ * seed it matches the corresponding predefined `Domain.slug` so the existing
+ * flat flow and the new taxonomy line up.
+ */
+export interface Subject {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+/** A topic within a subject, e.g. "Algebra" within Mathematics. */
 export interface Topic {
   id: string;
-  domainId: string;
+  subjectId: string;
   name: string;
 }
 
 /**
  * The atomic unit of knowledge. Quiz questions map to concepts; mastery,
  * weakness detection and spaced repetition all operate at the concept level.
+ * A concept may belong to more than one topic (and so span subjects) — shared,
+ * never duplicated (Phase 6.1).
  */
 export interface Concept {
   id: string;
-  topicId: string;
   name: string;
+  /** Topics this concept belongs to — one or more. */
+  topicIds: string[];
   /**
    * 0..1 weight for 80/20 prioritization (#7): higher means more foundational
    * / higher-value, so the scheduler surfaces it earlier.
    */
-  foundationalWeight: number;
+  foundationalWeight?: number;
   /** Concept ids that should be understood before this one (#12). */
-  prerequisiteIds: string[];
+  prerequisiteIds?: string[];
 }
 
 /** A single quiz question. LLM-generated, cached, and reused across users. */
