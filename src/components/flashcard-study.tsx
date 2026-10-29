@@ -6,8 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import type { Deck } from "@/lib/flashcards/decks";
+import type { StudyCard } from "@/lib/flashcards/catalogue";
 import type { FlashcardType } from "@/types/learning";
+
+/** A named set of cards to study (a subject/topic/concept group, or due cards). */
+export interface StudyDeck {
+  name: string;
+  cards: StudyCard[];
+}
 
 const TYPE_BADGE: Record<
   FlashcardType,
@@ -25,7 +31,7 @@ const SWIPE_THRESHOLD = 50;
  * Full-screen, Quizlet-style study view for one deck: tap/space to flip, swipe
  * or arrow keys / buttons to move between cards, Escape to close.
  */
-export function FlashcardStudy({ deck, onClose }: { deck: Deck; onClose: () => void }) {
+export function FlashcardStudy({ deck, onClose }: { deck: StudyDeck; onClose: () => void }) {
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   // Direction of the last move (1 = forward, -1 = back) for the slide-in animation.

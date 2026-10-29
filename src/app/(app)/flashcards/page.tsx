@@ -2,13 +2,13 @@ import Link from "next/link";
 import { Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
-import { DeckBrowser } from "@/components/deck-browser";
-import { ReviewSession, type DueCard } from "@/components/review-session";
+import { FlashcardsBrowser } from "@/components/flashcards-browser";
+import { type DueCard } from "@/components/review-session";
 import { predefinedLearnable } from "@/lib/learnable";
 import { createClient } from "@/lib/db/server";
 import { customTitleMap } from "@/lib/db/learnable-server";
 import { isSupabaseConfigured } from "@/lib/env";
-import { groupIntoDecks } from "@/lib/flashcards/decks";
+import { buildFlashcardCatalogue } from "@/lib/flashcards/catalogue";
 import { orderByConceptWeakness } from "@/lib/learning/flashcards";
 import { getTaxonomy } from "@/lib/db/taxonomy-server";
 import type { FlashcardType } from "@/types/learning";
@@ -98,51 +98,30 @@ export default async function FlashcardsPage() {
     hint: conceptName(c.concept_id) ?? displayName(c.domain_slug, titles),
   }));
 
-  const decks = groupIntoDecks(
+  const catalogue = buildFlashcardCatalogue(
     cards.map((c) => ({
       id: c.id,
-      slug: c.domain_slug,
-      name: displayName(c.domain_slug, titles),
+      domainSlug: c.domain_slug,
+      subjectName: displayName(c.domain_slug, titles),
+      conceptId: c.concept_id,
       type: c.type,
       front: c.front,
       back: c.back,
-      conceptName: conceptName(c.concept_id),
       due: isDue(c),
     })),
+    tax,
   );
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Flashcards</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Each subject is a deck. Open one to study its cards — tap to flip, swipe to move on.
+          Review what&apos;s due, or browse your cards by subject, topic, or concept.
         </p>
       </div>
 
-      {dueCards.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-medium">
-            Due for review <span className="text-muted-foreground">· {dueCards.length}</span>
-          </h2>
-          <p className="text-muted-foreground text-sm">
-            Spaced repetition brings cards back at the right time. Rate your recall to reschedule
-            each one.
-          </p>
-          <ReviewSession cards={dueCards} />
-        </section>
-      )}
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">
-          Your decks <span className="text-muted-foreground">· {decks.length}</span>
-        </h2>
-        <p className="text-muted-foreground text-sm">
-          Weakness cards target what you got wrong, foundational cards reinforce the essentials, and
-          connections link ideas to subjects you already know.
-        </p>
-        <DeckBrowser decks={decks} />
-      </section>
+      <FlashcardsBrowser catalogue={catalogue} dueCards={dueCards} />
     </div>
   );
 }
