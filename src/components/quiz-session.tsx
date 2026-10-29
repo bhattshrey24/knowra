@@ -62,8 +62,11 @@ export function QuizSession({
   suggestDiagnostic?: boolean;
 }) {
   const [status, setStatus] = useState<Status>("setup");
+  const [adaptive, setAdaptive] = useState(true);
   const [difficulty, setDifficulty] = useState<Difficulty>(recommendedDifficulty ?? 3);
   const [formats, setFormats] = useState<QuizFormat[]>(["mcq"]);
+  // The level adaptive mode would use (shown on the Adaptive card).
+  const adaptiveLevel: Difficulty = recommendedDifficulty ?? 3;
   const [count, setCount] = useState(MIN_QUESTIONS);
   const [timerEnabled, setTimerEnabled] = useState(false);
   const [timerMinutes, setTimerMinutes] = useState(5);
@@ -83,6 +86,9 @@ export function QuizSession({
 
   async function startQuiz(opts?: { diagnostic?: boolean }) {
     if (formats.length === 0) return;
+    // Adaptive uses the recommended level; the active view shows it too.
+    const level: Difficulty = adaptive ? adaptiveLevel : difficulty;
+    setDifficulty(level);
     setStatus("loading");
     const controller = new AbortController();
     // Above the server LLM timeout (Gemini ~30s, local Ollama up to 60s) so the
@@ -94,7 +100,7 @@ export function QuizSession({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           domain: domainSlug,
-          difficulty,
+          difficulty: level,
           count,
           formats,
           scope: scope ? { level: scope.level, id: scope.id } : undefined,
@@ -244,46 +250,70 @@ export function QuizSession({
           </div>
         )}
 
-        <div>
-          <p className="text-sm font-medium">Choose a difficulty</p>
-          <p className="text-muted-foreground text-sm">
-            {recommendedDifficulty
-              ? "Based on how you've done so far, Knowra suggests the highlighted level — but you always get the final say."
-              : "Start wherever you like. As Knowra learns your level it will recommend one — you always get the final say."}
-          </p>
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Difficulty</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              aria-pressed={adaptive}
+              disabled={status === "loading"}
+              onClick={() => setAdaptive(true)}
+              className={cn(
+                "rounded-lg border p-3 text-left transition-colors disabled:opacity-60",
+                adaptive
+                  ? "border-primary bg-accent text-accent-foreground"
+                  : "hover:border-primary/40",
+              )}
+            >
+              <div className="text-sm font-medium">Adaptive</div>
+              <div className="text-muted-foreground text-xs">
+                Knowra picks — level {adaptiveLevel}
+              </div>
+            </button>
+            <button
+              type="button"
+              aria-pressed={!adaptive}
+              disabled={status === "loading"}
+              onClick={() => setAdaptive(false)}
+              className={cn(
+                "rounded-lg border p-3 text-left transition-colors disabled:opacity-60",
+                !adaptive
+                  ? "border-primary bg-accent text-accent-foreground"
+                  : "hover:border-primary/40",
+              )}
+            >
+              <div className="text-sm font-medium">Choose yourself</div>
+              <div className="text-muted-foreground text-xs">Pick a fixed level 1–5</div>
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-2">
-          {LEVELS.map(({ value, label }) => {
-            const active = difficulty === value;
-            const recommended = recommendedDifficulty === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                aria-label={`Difficulty ${value}: ${label}${recommended ? " (recommended)" : ""}`}
-                aria-pressed={active}
-                disabled={status === "loading"}
-                onClick={() => setDifficulty(value)}
-                className={cn(
-                  "relative flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors disabled:opacity-60",
-                  active
-                    ? "border-primary bg-accent text-accent-foreground"
-                    : "hover:border-primary/40",
-                  recommended && !active && "border-primary/50",
-                )}
-              >
-                {recommended && (
-                  <span className="bg-primary text-primary-foreground absolute -top-2 rounded-full px-1.5 py-0.5 text-[9px] font-medium">
-                    Suggested
-                  </span>
-                )}
-                <span className="text-lg font-semibold">{value}</span>
-                <span className="text-muted-foreground text-[11px]">{label}</span>
-              </button>
-            );
-          })}
-        </div>
+        {!adaptive && (
+          <div className="grid grid-cols-5 gap-2">
+            {LEVELS.map(({ value, label }) => {
+              const active = difficulty === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-label={`Difficulty ${value}: ${label}`}
+                  aria-pressed={active}
+                  disabled={status === "loading"}
+                  onClick={() => setDifficulty(value)}
+                  className={cn(
+                    "flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors disabled:opacity-60",
+                    active
+                      ? "border-primary bg-accent text-accent-foreground"
+                      : "hover:border-primary/40",
+                  )}
+                >
+                  <span className="text-lg font-semibold">{value}</span>
+                  <span className="text-muted-foreground text-[11px]">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="space-y-2">
           <p className="text-sm font-medium">Question types</p>

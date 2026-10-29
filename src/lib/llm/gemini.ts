@@ -27,6 +27,7 @@ import {
   toGeneratedQuestion,
   toGeneratedWrittenQuestion,
 } from "@/lib/validation/question";
+import { difficultyGuideline } from "@/lib/learning/difficulty";
 import { conceptClause } from "@/lib/llm/concept-prompt";
 
 type FetchFn = typeof fetch;
@@ -97,7 +98,7 @@ export class GeminiProvider implements LLMProvider {
 
   async generateQuestions(input: GenerateQuestionsInput): Promise<GeneratedQuestion[]> {
     const format = input.formats[0] ?? "mcq";
-    const context = `"${input.conceptName}" (topic: ${input.topicName}, subject: ${input.domainName}) at difficulty ${input.difficulty}/5`;
+    const context = `"${input.conceptName}" (topic: ${input.topicName}, subject: ${input.domainName}) at difficulty ${input.difficulty}/5 (that level should ${difficultyGuideline(input.difficulty)})`;
     const avoid = input.avoidPrompts?.length
       ? ` Avoid repeating: ${input.avoidPrompts.join(" | ")}.`
       : "";

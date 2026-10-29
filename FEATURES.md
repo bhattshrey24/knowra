@@ -127,10 +127,15 @@ validates every taxonomy relationship, question structure, answer key, and diffi
   unassessed concepts; the dashboard flags low-confidence subjects/concepts as "Uncertain". Live
   verification needs seeded concept history. Per-question varied difficulty within one generation
   call is future work._
-- ⬜ **6.6 Difficulty calibration:** Separate **question difficulty** from **user mastery**.
+- 🟨 **6.6 Difficulty calibration:** Separate **question difficulty** from **user mastery**.
   Difficulty 1–5 with consistent, concept-calibrated guidelines (concept + reasoning required).
   Recommend difficulty from diagnostics, mastery estimates, recent performance, and learning
-  goals; adaptive difficulty is the **default**, user can still choose their own.
+  goals; adaptive difficulty is the **default**, user can still choose their own. _Landed:
+  consistent per-level guidelines (`learning/difficulty.ts`) fed into the generation prompt so a
+  level means the same across concepts; `recommendAdaptiveDifficulty` (unit-tested) blends mastery
+  band + recent accuracy with the progressive-load cap; the quiz-start screen defaults to
+  **Adaptive** (Knowra picks the level, computed server-side from mastery + recent attempts), with
+  a "Choose yourself" 1–5 override. Learning-goals input is future work._
 - ⬜ **6.7 Learner profile:** Continuously update concept-level mastery and weaknesses from quiz
   attempts, accuracy, question difficulty, timestamps, and retention results where available.
   Derive topic-/subject-level insight from concept-level evidence. **Never** mark a concept

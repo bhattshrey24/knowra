@@ -6,7 +6,7 @@ import { predefinedLearnable } from "@/lib/learnable";
 import { resolveLearnable } from "@/lib/db/learnable-server";
 import { createClient } from "@/lib/db/server";
 import { isSupabaseConfigured } from "@/lib/env";
-import { recommendDifficulty } from "@/lib/learning/recommend";
+import { recommendAdaptiveDifficulty } from "@/lib/learning/recommend";
 import { getTaxonomy } from "@/lib/db/taxonomy-server";
 import { conceptsForScope } from "@/lib/learning/taxonomy";
 import { fetchConceptMastery } from "@/lib/db/concept-mastery-server";
@@ -49,14 +49,33 @@ async function recommendedFor(domainSlug: string): Promise<Difficulty | undefine
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return undefined;
-    const { data } = await supabase
-      .from("domain_mastery")
-      .select("mastery,confidence,attempts,correct")
-      .eq("user_id", user.id)
-      .eq("domain_slug", domainSlug)
-      .maybeSingle();
-    if (!data) return undefined;
-    return recommendDifficulty(data as MasteryState);
+    const [masteryRes, recentRes] = await Promise.all([
+      supabase
+        .from("domain_mastery")
+        .select("mastery,confidence,attempts,correct")
+        .eq("user_id", user.id)
+        .eq("domain_slug", domainSlug)
+        .maybeSingle(),
+      supabase
+        .from("quiz_attempts")
+        .select("total,correct")
+        .eq("user_id", user.id)
+        .eq("domain_slug", domainSlug)
+        .order("created_at", { ascending: false })
+        .limit(3),
+    ]);
+    if (!masteryRes.data) return undefined;
+
+    const recent = recentRes.data ?? [];
+    const answered = recent.reduce((n, a) => n + (a.total as number), 0);
+    const recentAccuracy = answered
+      ? recent.reduce((n, a) => n + (a.correct as number), 0) / answered
+      : undefined;
+
+    return recommendAdaptiveDifficulty({
+      mastery: masteryRes.data as MasteryState,
+      recentAccuracy,
+    });
   } catch {
     return undefined;
   }
