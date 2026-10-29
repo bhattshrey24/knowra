@@ -3,7 +3,7 @@ import { Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { FlashcardsBrowser } from "@/components/flashcards-browser";
-import { type DueCard } from "@/components/review-session";
+import { type ReviewCard } from "@/components/flashcard-review";
 import { predefinedLearnable } from "@/lib/learnable";
 import { createClient } from "@/lib/db/server";
 import { customTitleMap } from "@/lib/db/learnable-server";
@@ -91,11 +91,11 @@ export default async function FlashcardsPage() {
     cards.filter(isDue).map((c) => ({ ...c, conceptId: c.concept_id ?? undefined })),
     masteryByConcept,
   );
-  const dueCards: DueCard[] = dueOrdered.map((c) => ({
+  const dueCards: ReviewCard[] = dueOrdered.map((c) => ({
     id: c.id,
     front: c.front,
     back: c.back,
-    hint: conceptName(c.concept_id) ?? displayName(c.domain_slug, titles),
+    label: conceptName(c.concept_id) ?? displayName(c.domain_slug, titles),
   }));
 
   const catalogue = buildFlashcardCatalogue(

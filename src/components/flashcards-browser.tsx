@@ -1,13 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, CalendarCheck, ChevronRight, Clock, Layers, X } from "lucide-react";
+import { ArrowRight, CalendarCheck, ChevronRight, Clock, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { subjectIcon } from "@/lib/subject-icons";
-import { FlashcardStudy, type StudyDeck } from "@/components/flashcard-study";
-import { ReviewSession, type DueCard } from "@/components/review-session";
+import { FlashcardReview, type ReviewCard } from "@/components/flashcard-review";
 import type { FlashcardCatalogue, FlashGroup, FlashLevel } from "@/lib/flashcards/catalogue";
+
+interface Session {
+  title: string;
+  cards: ReviewCard[];
+}
 
 type Filter = "all" | "due";
 
@@ -34,13 +38,12 @@ export function FlashcardsBrowser({
   dueCards,
 }: {
   catalogue: FlashcardCatalogue;
-  dueCards: DueCard[];
+  dueCards: ReviewCard[];
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [tab, setTab] = useState<FlashLevel>("subjects");
   const [expanded, setExpanded] = useState(false);
-  const [study, setStudy] = useState<StudyDeck | null>(null);
-  const [reviewing, setReviewing] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
 
   function switchTab(next: FlashLevel) {
     setTab(next);
@@ -52,8 +55,16 @@ export function FlashcardsBrowser({
   const shown = expanded ? groups : groups.slice(0, LIMIT);
 
   function openGroup(g: FlashGroup) {
-    const cards = filter === "due" ? g.cards.filter((c) => c.due) : g.cards;
-    setStudy({ name: g.name, cards });
+    const source = filter === "due" ? g.cards.filter((c) => c.due) : g.cards;
+    setSession({
+      title: g.name,
+      cards: source.map((c) => ({
+        id: c.id,
+        front: c.front,
+        back: c.back,
+        label: c.conceptName ?? g.name,
+      })),
+    });
   }
 
   return (
@@ -72,7 +83,10 @@ export function FlashcardsBrowser({
             </div>
             <span className="text-2xl font-semibold tabular-nums">{dueCards.length}</span>
           </div>
-          <Button className="w-full" onClick={() => setReviewing(true)}>
+          <Button
+            className="w-full"
+            onClick={() => setSession({ title: "Due for review", cards: dueCards })}
+          >
             Review all due cards
             <ArrowRight className="size-4" />
           </Button>
@@ -169,8 +183,13 @@ export function FlashcardsBrowser({
         )}
       </div>
 
-      {study && <FlashcardStudy deck={study} onClose={() => setStudy(null)} />}
-      {reviewing && <ReviewOverlay cards={dueCards} onClose={() => setReviewing(false)} />}
+      {session && (
+        <FlashcardReview
+          title={session.title}
+          cards={session.cards}
+          onExit={() => setSession(null)}
+        />
+      )}
     </div>
   );
 }
@@ -202,26 +221,5 @@ function FilterCard({
       <span className="mt-1 text-sm font-medium">{title}</span>
       <span className="text-muted-foreground text-xs">{caption}</span>
     </button>
-  );
-}
-
-function ReviewOverlay({ cards, onClose }: { cards: DueCard[]; onClose: () => void }) {
-  return (
-    <div
-      className="bg-background/95 fixed inset-0 z-50 flex flex-col backdrop-blur"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Review due cards"
-    >
-      <div className="mx-auto w-full max-w-xl px-4 py-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold tracking-tight">Review due cards</h2>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close review">
-            <X className="size-5" />
-          </Button>
-        </div>
-        <ReviewSession cards={cards} />
-      </div>
-    </div>
   );
 }
