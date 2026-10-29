@@ -8,6 +8,7 @@
 import type { Difficulty } from "@/types/learning";
 import { INITIAL_MASTERY, updateMastery, type MasteryState } from "@/lib/learning/mastery";
 import { conceptsForScope, type Taxonomy } from "@/lib/learning/taxonomy";
+import { MIN_EVIDENCE } from "@/lib/learning/concept-selection";
 
 export interface ConceptOutcome {
   conceptId: string;
@@ -84,4 +85,17 @@ export function aggregateByLevel(
     result.set(node.id, rollup(conceptsForScope(tax, level, node.id), byConcept));
   }
   return result;
+}
+
+/**
+ * The learner's weakest concepts (lowest mastery first), among those with
+ * enough evidence to judge — the highest-value things to revise. Returns
+ * concept ids; ties break by id for determinism.
+ */
+export function weakestConcepts(byConcept: Map<string, MasteryState>, limit = 5): string[] {
+  return [...byConcept.entries()]
+    .filter(([, s]) => s.attempts >= MIN_EVIDENCE)
+    .sort((a, b) => a[1].mastery - b[1].mastery || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([id]) => id);
 }

@@ -25,7 +25,7 @@ export interface SelectedConcept {
 }
 
 /** Attempts required before a concept can be judged weak or mastered. */
-const MIN_EVIDENCE = 2;
+export const MIN_EVIDENCE = 2;
 const WEAK_BELOW = 0.5;
 const MASTERED_AT = 0.75;
 /** A mastered concept unseen for this many days is due for a retention check. */

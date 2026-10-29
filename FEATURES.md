@@ -95,8 +95,10 @@ validates every taxonomy relationship, question structure, answer key, and diffi
   records each tagged answer's outcome and updates concept mastery. Balanced subject/topic-quiz
   selection — `selectConceptsForQuiz` (unit-tested) picks a weak / unassessed / retention-due mix
   with a min-evidence gate (never weak/mastered from a single response); `/api/quiz` uses it with
-  the learner's `concept_mastery` (degrades to a clean spread without data). Next: surface the
-  concept→topic→subject rollups on the dashboard and make flashcards/revision concept-aware._
+  the learner's `concept_mastery` (degrades to a clean spread without data). Dashboard surfaces the
+  concept→topic rollups (`aggregateByLevel`) as a "By topic" breakdown plus a "Weakest concepts"
+  list that deep-links to concept quizzes (`weakestConcepts`, min-evidence gated). Next: make
+  generated flashcards/revision concept-aware (tag + prioritise by weak concepts)._
 - ⬜ **6.3 Search & create:** Homepage search bar over existing subjects/topics/concepts. If no
   match, the user describes what they want to learn; the LLM proposes a classification, checks for
   duplicates and valid relationships, and the user can correct it before saving.
