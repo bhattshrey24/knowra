@@ -147,7 +147,12 @@ export function FlashcardStudy({ deck, onClose }: { deck: Deck; onClose: () => v
                 )}
               >
                 <div className="bg-card absolute inset-0 flex flex-col items-center justify-center gap-4 rounded-2xl border p-6 text-center shadow-sm backface-hidden">
-                  <Badge variant={badge.variant}>{badge.label}</Badge>
+                  <span className="flex flex-wrap items-center justify-center gap-2">
+                    <Badge variant={badge.variant}>{badge.label}</Badge>
+                    {card.conceptName && (
+                      <span className="text-muted-foreground text-xs">{card.conceptName}</span>
+                    )}
+                  </span>
                   <p className="text-xl font-medium text-balance">{card.front}</p>
                   <span className="text-muted-foreground text-xs">Tap or press space to flip</span>
                 </div>

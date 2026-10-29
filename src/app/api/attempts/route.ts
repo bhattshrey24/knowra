@@ -196,6 +196,7 @@ export async function POST(req: Request): Promise<Response> {
         .map((card) => ({
           user_id: user.id,
           domain_slug: domain,
+          concept_id: card.conceptId ?? null,
           type: card.type,
           front: card.front,
           back: card.back,

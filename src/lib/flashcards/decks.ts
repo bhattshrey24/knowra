@@ -16,6 +16,8 @@ export interface DeckInput {
   type: FlashcardType;
   front: string;
   back: string;
+  /** The concept this card revises, resolved to a display name (Phase 6.2). */
+  conceptName?: string;
   /** Whether this card is currently due for spaced-repetition review. */
   due?: boolean;
 }
@@ -25,6 +27,7 @@ export interface DeckCard {
   front: string;
   back: string;
   type: FlashcardType;
+  conceptName?: string;
   due: boolean;
 }
 
@@ -63,6 +66,7 @@ export function groupIntoDecks(cards: DeckInput[]): Deck[] {
       front: card.front,
       back: card.back,
       type: card.type,
+      conceptName: card.conceptName,
       due: Boolean(card.due),
     });
     deck.counts[card.type] += 1;

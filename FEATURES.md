@@ -97,8 +97,10 @@ validates every taxonomy relationship, question structure, answer key, and diffi
   with a min-evidence gate (never weak/mastered from a single response); `/api/quiz` uses it with
   the learner's `concept_mastery` (degrades to a clean spread without data). Dashboard surfaces the
   concept→topic rollups (`aggregateByLevel`) as a "By topic" breakdown plus a "Weakest concepts"
-  list that deep-links to concept quizzes (`weakestConcepts`, min-evidence gated). Next: make
-  generated flashcards/revision concept-aware (tag + prioritise by weak concepts)._
+  list that deep-links to concept quizzes (`weakestConcepts`, min-evidence gated). Flashcards are
+  concept-aware: cards carry `concept_id` (migration `0009`), the study view shows the concept, and
+  the Due-for-review queue is ordered weakest-concept-first (`orderByConceptWeakness`). **All of
+  6.2's code is in; live verification needs migrations `0007`–`0009` applied + anon auth.**_
 - ⬜ **6.3 Search & create:** Homepage search bar over existing subjects/topics/concepts. If no
   match, the user describes what they want to learn; the LLM proposes a classification, checks for
   duplicates and valid relationships, and the user can correct it before saving.

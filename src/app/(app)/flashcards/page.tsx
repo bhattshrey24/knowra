@@ -9,6 +9,8 @@ import { createClient } from "@/lib/db/server";
 import { customTitleMap } from "@/lib/db/learnable-server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { groupIntoDecks } from "@/lib/flashcards/decks";
+import { orderByConceptWeakness } from "@/lib/learning/flashcards";
+import { getTaxonomy } from "@/lib/db/taxonomy-server";
 import type { FlashcardType } from "@/types/learning";
 
 export const metadata = { title: "Flashcards" };
@@ -17,28 +19,38 @@ export const dynamic = "force-dynamic";
 interface CardRow {
   id: string;
   domain_slug: string;
+  concept_id: string | null;
   type: FlashcardType;
   front: string;
   back: string;
   due_at: string;
 }
 
-async function loadCards(): Promise<{ cards: CardRow[]; titles: Map<string, string> }> {
-  if (!isSupabaseConfigured()) return { cards: [], titles: new Map() };
+async function loadCards(): Promise<{
+  cards: CardRow[];
+  titles: Map<string, string>;
+  masteryByConcept: Map<string, number>;
+}> {
+  const empty = { cards: [], titles: new Map(), masteryByConcept: new Map() };
+  if (!isSupabaseConfigured()) return empty;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { cards: [], titles: new Map() };
-  const [cardsRes, titles] = await Promise.all([
+  if (!user) return empty;
+  const [cardsRes, masteryRes, titles] = await Promise.all([
     supabase
       .from("flashcards")
-      .select("id,domain_slug,type,front,back,due_at")
+      .select("id,domain_slug,concept_id,type,front,back,due_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
+    supabase.from("concept_mastery").select("concept_id,mastery").eq("user_id", user.id),
     customTitleMap(),
   ]);
-  return { cards: (cardsRes.data as CardRow[] | null) ?? [], titles };
+  const masteryByConcept = new Map<string, number>(
+    (masteryRes.data ?? []).map((m) => [m.concept_id as string, m.mastery as number]),
+  );
+  return { cards: (cardsRes.data as CardRow[] | null) ?? [], titles, masteryByConcept };
 }
 
 function displayName(slug: string, titles: Map<string, string>): string {
@@ -46,7 +58,7 @@ function displayName(slug: string, titles: Map<string, string>): string {
 }
 
 export default async function FlashcardsPage() {
-  const { cards, titles } = await loadCards();
+  const { cards, titles, masteryByConcept } = await loadCards();
 
   if (cards.length === 0) {
     return (
@@ -71,12 +83,19 @@ export default async function FlashcardsPage() {
 
   const now = Date.now();
   const isDue = (c: CardRow) => new Date(c.due_at).getTime() <= now;
+  const tax = await getTaxonomy();
+  const conceptName = (id: string | null) => (id && tax.conceptById.get(id)?.name) || undefined;
 
-  const dueCards: DueCard[] = cards.filter(isDue).map((c) => ({
+  // Revise the weakest concepts first (Phase 6.2).
+  const dueOrdered = orderByConceptWeakness(
+    cards.filter(isDue).map((c) => ({ ...c, conceptId: c.concept_id ?? undefined })),
+    masteryByConcept,
+  );
+  const dueCards: DueCard[] = dueOrdered.map((c) => ({
     id: c.id,
     front: c.front,
     back: c.back,
-    hint: displayName(c.domain_slug, titles),
+    hint: conceptName(c.concept_id) ?? displayName(c.domain_slug, titles),
   }));
 
   const decks = groupIntoDecks(
@@ -87,6 +106,7 @@ export default async function FlashcardsPage() {
       type: c.type,
       front: c.front,
       back: c.back,
+      conceptName: conceptName(c.concept_id),
       due: isDue(c),
     })),
   );
