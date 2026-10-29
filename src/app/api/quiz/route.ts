@@ -10,6 +10,7 @@ import { getTaxonomy } from "@/lib/db/taxonomy-server";
 import { conceptsForScope, subjectsOfConcept, type Taxonomy } from "@/lib/learning/taxonomy";
 import { assignConceptIds, type AllowedConcept } from "@/lib/learning/concept-tagging";
 import { selectConceptsForQuiz } from "@/lib/learning/concept-selection";
+import { planDiagnostic } from "@/lib/learning/diagnostic";
 import { fetchConceptMastery } from "@/lib/db/concept-mastery-server";
 import type { TaxonomyLevel } from "@/types/learning";
 import { rateLimit } from "@/lib/rate-limit";
@@ -34,6 +35,9 @@ const bodySchema = z.object({
   scope: z
     .object({ level: z.enum(["topic", "concept"]), id: z.string().min(1).max(100) })
     .optional(),
+  // Diagnostic mode (Phase 6.5): probe the area's unassessed concepts to
+  // calibrate, rather than the usual balanced selection.
+  diagnostic: z.boolean().optional(),
 });
 
 type GenInput = {
@@ -62,6 +66,7 @@ async function conceptsForQuiz(
   subjectSlug: string,
   count: number,
   scope?: { level: "topic" | "concept"; id: string },
+  diagnostic?: boolean,
 ): Promise<AllowedConcept[]> {
   const tax = await getTaxonomy();
 
@@ -79,20 +84,27 @@ async function conceptsForQuiz(
   if (scopeConceptIds.length === 0) return [];
   if (level === "concept") return toAllowed(scopeConceptIds, tax);
 
-  // Subject / topic: balance the selection by the learner's concept mastery.
+  // Subject / topic: select by the learner's concept mastery.
   const mastery = await fetchConceptMastery(scopeConceptIds);
-  const selected = selectConceptsForQuiz(
-    scopeConceptIds.map((cid) => ({
-      id: cid,
-      state: mastery.get(cid)?.state,
-      lastSeenDaysAgo: mastery.get(cid)?.lastSeenDaysAgo,
-    })),
-    count,
-  );
-  return toAllowed(
-    selected.map((s) => s.id),
-    tax,
-  );
+  const candidates = scopeConceptIds.map((cid) => ({
+    id: cid,
+    state: mastery.get(cid)?.state,
+    lastSeenDaysAgo: mastery.get(cid)?.lastSeenDaysAgo,
+  }));
+
+  // Diagnostic: probe the unassessed concepts to calibrate. Otherwise balance
+  // weak / unassessed / retention.
+  const selectedIds = diagnostic
+    ? planDiagnostic(candidates, count).map((p) => p.conceptId)
+    : selectConceptsForQuiz(candidates, count).map((s) => s.id);
+
+  // A diagnostic on an already-covered area may have nothing to probe — fall
+  // back to a balanced selection so the quiz is never empty.
+  const ids =
+    selectedIds.length > 0
+      ? selectedIds
+      : selectConceptsForQuiz(candidates, count).map((s) => s.id);
+  return toAllowed(ids, tax);
 }
 
 /**
@@ -144,7 +156,7 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  const { domain, difficulty, count, scope } = parsed.data;
+  const { domain, difficulty, count, scope, diagnostic } = parsed.data;
   // Prefer the array; fall back to the legacy singular field, then default mcq.
   const formats: QuestionFormat[] = parsed.data.formats ?? [parsed.data.format ?? "mcq"];
   const learnable = await resolveLearnable(domain);
@@ -157,7 +169,7 @@ export async function POST(req: Request): Promise<Response> {
   // aren't in the taxonomy — they keep their own slug as the concept id.
   const allowedConcepts = learnable.isCustom
     ? []
-    : await conceptsForQuiz(learnable.slug, count, scope);
+    : await conceptsForQuiz(learnable.slug, count, scope, diagnostic);
 
   const provider = getLLMProvider();
   const genInput: GenInput = {

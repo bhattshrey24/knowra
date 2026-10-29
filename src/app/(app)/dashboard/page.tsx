@@ -13,6 +13,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { INITIAL_MASTERY, masteryOutOfTen, type MasteryState } from "@/lib/learning/mastery";
 import { focusAreas, needsFoundationalWork, type FocusReason } from "@/lib/learning/focus";
 import { aggregateByLevel, weakestConcepts } from "@/lib/learning/aggregate";
+import { isUncertain } from "@/lib/learning/diagnostic";
 import { subjectsOfConcept } from "@/lib/learning/taxonomy";
 import { getTaxonomy } from "@/lib/db/taxonomy-server";
 import { quizHref } from "@/lib/taxonomy/catalogue";
@@ -221,8 +222,11 @@ export default async function DashboardPage() {
             return (
               <Card key={row.domain_slug}>
                 <CardHeader className="pb-3">
-                  <div className="flex items-baseline justify-between">
-                    <CardTitle className="text-base">{name}</CardTitle>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                      <CardTitle className="text-base">{name}</CardTitle>
+                      {isUncertain(row) && <Badge variant="outline">Uncertain</Badge>}
+                    </span>
                     <span className="text-sm font-semibold">
                       {outOfTen}
                       <span className="text-muted-foreground">/10</span>
@@ -291,7 +295,10 @@ export default async function DashboardPage() {
                   className="hover:bg-muted flex items-center justify-between gap-3 px-4 py-3 transition-colors"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">{concept.name}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium">{concept.name}</span>
+                      {isUncertain(byConcept.get(id)) && <Badge variant="outline">Uncertain</Badge>}
+                    </span>
                     <span className="text-muted-foreground block truncate text-xs">
                       {[subjectName, topicName].filter(Boolean).join(" · ")}
                     </span>

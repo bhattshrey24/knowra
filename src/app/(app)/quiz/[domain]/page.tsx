@@ -8,6 +8,9 @@ import { createClient } from "@/lib/db/server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { recommendDifficulty } from "@/lib/learning/recommend";
 import { getTaxonomy } from "@/lib/db/taxonomy-server";
+import { conceptsForScope } from "@/lib/learning/taxonomy";
+import { fetchConceptMastery } from "@/lib/db/concept-mastery-server";
+import { needsDiagnostic } from "@/lib/learning/diagnostic";
 import type { MasteryState } from "@/lib/learning/mastery";
 import type { Difficulty } from "@/types/learning";
 
@@ -59,6 +62,19 @@ async function recommendedFor(domainSlug: string): Promise<Difficulty | undefine
   }
 }
 
+/** Whether this subject has too little concept history, so a diagnostic helps. */
+async function suggestDiagnosticFor(subjectSlug: string): Promise<boolean> {
+  try {
+    const tax = await getTaxonomy();
+    const conceptIds = conceptsForScope(tax, "subject", subjectSlug);
+    if (conceptIds.length === 0) return false;
+    const mastery = await fetchConceptMastery(conceptIds);
+    return needsDiagnostic(conceptIds.map((id) => ({ id, state: mastery.get(id)?.state })));
+  } catch {
+    return false;
+  }
+}
+
 export default async function QuizStartPage({
   params,
   searchParams,
@@ -70,10 +86,13 @@ export default async function QuizStartPage({
   const found = await resolveLearnable(domain);
   if (!found) notFound();
 
+  const sp = await searchParams;
   const [recommendedDifficulty, scope] = await Promise.all([
     recommendedFor(found.slug),
-    resolveScope(await searchParams),
+    resolveScope(sp),
   ]);
+  // Only suggest a diagnostic for a whole subject (not a topic/concept scope).
+  const suggestDiagnostic = scope ? false : await suggestDiagnosticFor(found.slug);
 
   return (
     <div className="mx-auto max-w-xl space-y-8">
@@ -97,6 +116,7 @@ export default async function QuizStartPage({
         domainName={found.name}
         recommendedDifficulty={recommendedDifficulty}
         scope={scope}
+        suggestDiagnostic={suggestDiagnostic}
       />
     </div>
   );

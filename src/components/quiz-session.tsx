@@ -53,11 +53,13 @@ export function QuizSession({
   domainName,
   recommendedDifficulty,
   scope,
+  suggestDiagnostic = false,
 }: {
   domainSlug: string;
   domainName: string;
   recommendedDifficulty?: Difficulty;
   scope?: QuizScope;
+  suggestDiagnostic?: boolean;
 }) {
   const [status, setStatus] = useState<Status>("setup");
   const [difficulty, setDifficulty] = useState<Difficulty>(recommendedDifficulty ?? 3);
@@ -79,7 +81,7 @@ export function QuizSession({
     );
   }
 
-  async function startQuiz() {
+  async function startQuiz(opts?: { diagnostic?: boolean }) {
     if (formats.length === 0) return;
     setStatus("loading");
     const controller = new AbortController();
@@ -96,6 +98,7 @@ export function QuizSession({
           count,
           formats,
           scope: scope ? { level: scope.level, id: scope.id } : undefined,
+          diagnostic: opts?.diagnostic ?? false,
         }),
         signal: controller.signal,
       });
@@ -219,6 +222,28 @@ export function QuizSession({
   if (status === "setup" || status === "loading" || status === "error") {
     return (
       <div className="space-y-6">
+        {suggestDiagnostic && (
+          <div className="border-primary/30 bg-accent/40 space-y-3 rounded-xl border p-4">
+            <div>
+              <p className="text-sm font-medium">New area — want a quick diagnostic?</p>
+              <p className="text-muted-foreground text-sm">
+                A short calibration quiz across {domainName} estimates what you already know, so
+                Knowra can pitch the right level. You can skip and just start below.
+              </p>
+            </div>
+            <Button onClick={() => startQuiz({ diagnostic: true })} disabled={status === "loading"}>
+              {status === "loading" ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Starting…
+                </>
+              ) : (
+                "Start diagnostic"
+              )}
+            </Button>
+          </div>
+        )}
+
         <div>
           <p className="text-sm font-medium">Choose a difficulty</p>
           <p className="text-muted-foreground text-sm">
@@ -388,7 +413,7 @@ export function QuizSession({
 
         <Button
           size="lg"
-          onClick={startQuiz}
+          onClick={() => startQuiz()}
           disabled={status === "loading" || formats.length === 0}
         >
           {status === "loading" ? (

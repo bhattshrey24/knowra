@@ -117,10 +117,16 @@ validates every taxonomy relationship, question structure, answer key, and diffi
   STEM, humanities, arts, social science, business and more (`taxonomy/seed.ts`, derived from
   `DOMAINS` so every subject is quizzable). Loading into the DB still needs migration `0007`
   applied + `POST /api/admin/seed-taxonomy`; until then `getTaxonomy()` serves this seed._
-- ⬜ **6.5 Adaptive diagnostics:** When a user picks an area with insufficient history, offer a
+- 🟨 **6.5 Adaptive diagnostics:** When a user picks an area with insufficient history, offer a
   short adaptive diagnostic to estimate concept-level mastery. Users may skip and start learning;
   mastery stays **uncertain** until there's enough evidence. Reuse reliable existing performance
-  data rather than re-assessing.
+  data rather than re-assessing. _Landed: deterministic engine (`learning/diagnostic.ts`,
+  unit-tested) — `needsDiagnostic` (coverage-based), `planDiagnostic` (probes only concepts lacking
+  evidence, reusing reliable ones, cycling difficulty), `isUncertain`. The quiz-start screen offers
+  a "quick diagnostic" on a thin subject (skippable); `/api/quiz` `diagnostic` mode probes
+  unassessed concepts; the dashboard flags low-confidence subjects/concepts as "Uncertain". Live
+  verification needs seeded concept history. Per-question varied difficulty within one generation
+  call is future work._
 - ⬜ **6.6 Difficulty calibration:** Separate **question difficulty** from **user mastery**.
   Difficulty 1–5 with consistent, concept-calibrated guidelines (concept + reasoning required).
   Recommend difficulty from diagnostics, mastery estimates, recent performance, and learning
