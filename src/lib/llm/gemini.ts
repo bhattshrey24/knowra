@@ -9,6 +9,8 @@
  */
 
 import type {
+  ClassifiedConcept,
+  ClassifyInput,
   ExplainInput,
   GeneratedFlashcard,
   GeneratedQuestion,
@@ -16,6 +18,7 @@ import type {
   GradeWrittenResult,
   LLMProvider,
 } from "@/lib/llm/provider";
+import { parseClassified } from "@/lib/validation/classify";
 import {
   parseLlmMcqs,
   parseLlmMulti,
@@ -72,6 +75,16 @@ const WRITTEN_RESPONSE_SCHEMA = {
   },
 } as const;
 
+const CLASSIFY_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    subject: { type: "STRING" },
+    topic: { type: "STRING" },
+    concept: { type: "STRING" },
+  },
+  required: ["subject", "topic", "concept"],
+} as const;
+
 export class GeminiProvider implements LLMProvider {
   readonly id = "gemini";
 
@@ -111,6 +124,19 @@ export class GeminiProvider implements LLMProvider {
     const parsed = parseLlmMcqs(raw);
     if (!parsed.success) throw new Error(`Gemini returned invalid MCQ output: ${parsed.error}`);
     return parsed.data.map((mcq) => toGeneratedQuestion(mcq, input.difficulty));
+  }
+
+  async classify(input: ClassifyInput): Promise<ClassifiedConcept> {
+    const existing = input.subjects.join(", ") || "(none yet)";
+    const prompt =
+      `Classify the learning request "${input.query}" into a Subject, Topic, and Concept for a ` +
+      `study catalogue. Prefer an existing subject when it genuinely fits: ${existing}. Use ` +
+      `concise, canonical names (e.g. Subject "Computer Science", Topic "Programming", Concept ` +
+      `"Decorators").`;
+    const raw = await this.generateJson(prompt, CLASSIFY_RESPONSE_SCHEMA);
+    const parsed = parseClassified(raw);
+    if (!parsed.success) throw new Error(`Gemini returned invalid classification: ${parsed.error}`);
+    return parsed.data;
   }
 
   async explain(input: ExplainInput): Promise<string> {

@@ -6,6 +6,8 @@
  */
 
 import type {
+  ClassifiedConcept,
+  ClassifyInput,
   ExplainInput,
   GeneratedFlashcard,
   GeneratedQuestion,
@@ -90,6 +92,16 @@ export class MockLLMProvider implements LLMProvider {
     return input.isCorrect
       ? `Correct. ${input.question.explanation ?? "Well reasoned."}`
       : `Not quite. ${input.question.explanation ?? "Review the key idea and try again."}`;
+  }
+
+  async classify(input: ClassifyInput): Promise<ClassifiedConcept> {
+    // Deterministic: reuse the first existing subject, treat the query as a new
+    // topic/concept. Real providers classify properly.
+    return {
+      subject: input.subjects[0] ?? "General Knowledge",
+      topic: input.query,
+      concept: input.query,
+    };
   }
 
   async gradeWritten(input: GradeWrittenInput): Promise<GradeWrittenResult> {

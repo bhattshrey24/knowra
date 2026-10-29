@@ -101,9 +101,16 @@ validates every taxonomy relationship, question structure, answer key, and diffi
   concept-aware: cards carry `concept_id` (migration `0009`), the study view shows the concept, and
   the Due-for-review queue is ordered weakest-concept-first (`orderByConceptWeakness`). **All of
   6.2's code is in; live verification needs migrations `0007`–`0009` applied + anon auth.**_
-- ⬜ **6.3 Search & create:** Homepage search bar over existing subjects/topics/concepts. If no
+- 🟨 **6.3 Search & create:** Homepage search bar over existing subjects/topics/concepts. If no
   match, the user describes what they want to learn; the LLM proposes a classification, checks for
-  duplicates and valid relationships, and the user can correct it before saving.
+  duplicates and valid relationships, and the user can correct it before saving. _Landed: LLM
+  `classify` behind the provider interface (mock/gemini/ollama, zod-validated); deterministic
+  `resolveClassification` (`learning/classify.ts`, unit-tested) matches proposed names to existing
+  nodes (reuse vs. new), detects duplicates, and mints collision-free slugs; `POST /api/classify`
+  proposes and `POST /api/learn` saves (re-resolved server-side, idempotent upserts via
+  `saveClassification`); `LearnCreate` lets the learner edit the Subject→Topic→Concept before
+  starting, then quizzes the new concept. `resolveLearnable` now resolves taxonomy subjects so
+  user-added ones are quizzable. Needs a real LLM + seeded DB to classify well live._
 - 🟨 **6.4 Initial taxonomy seed:** Seed the DB with a diverse, reasonably comprehensive set of
   subjects, topics, and concepts. The taxonomy expands as users explore new areas, **without
   creating duplicate entries**. _Landed: a 24-subject catalogue (~75 topics, ~215 concepts) across
