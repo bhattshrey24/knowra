@@ -90,7 +90,9 @@ export class OllamaProvider implements LLMProvider {
     private readonly baseUrl = "http://localhost:11434",
     private readonly model = "llama3.2",
     private readonly fetchFn: FetchFn = fetch,
-    private readonly timeoutMs = 60_000,
+    // Generous for slow local CPU inference, especially a cold first request.
+    // Override with OLLAMA_TIMEOUT_MS.
+    private readonly timeoutMs = 90_000,
   ) {}
 
   async generateQuestions(input: GenerateQuestionsInput): Promise<GeneratedQuestion[]> {
@@ -195,6 +197,8 @@ export class OllamaProvider implements LLMProvider {
         model: this.model,
         messages: [{ role: "user", content: prompt }],
         stream: false,
+        // Keep the model resident so the next request isn't a cold start.
+        keep_alive: "10m",
       }),
     );
     if (!res.ok) throw new Error(`Ollama request failed: ${res.status}`);
@@ -209,6 +213,8 @@ export class OllamaProvider implements LLMProvider {
         stream: false,
         format,
         options: { temperature: 0.6 },
+        // Keep the model resident so the next request isn't a cold start.
+        keep_alive: "10m",
       }),
     );
     if (!res.ok) throw new Error(`Ollama request failed: ${res.status}`);

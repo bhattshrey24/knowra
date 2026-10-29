@@ -29,16 +29,29 @@ export const llmMcqListSchema = z.array(llmMcqSchema).min(1).max(20);
 
 export type ParseResult<T> = { success: true; data: T } | { success: false; error: string };
 
+/** Max questions kept from a single generation. */
+const MAX_ITEMS = 20;
+
+/**
+ * Validate each item in an untrusted array, keeping the valid ones and dropping
+ * the rest (small local models occasionally emit one malformed question — one
+ * bad item shouldn't sink the whole quiz). Fails only when nothing is valid.
+ */
+function parseList<T>(raw: unknown, schema: z.ZodType<T>): ParseResult<T[]> {
+  if (!Array.isArray(raw)) return { success: false, error: "expected a JSON array" };
+  const data: T[] = [];
+  for (const item of raw) {
+    const result = schema.safeParse(item);
+    if (result.success) data.push(result.data);
+    if (data.length >= MAX_ITEMS) break;
+  }
+  if (data.length === 0) return { success: false, error: "no valid items in the array" };
+  return { success: true, data };
+}
+
 /** Safe-parse an untrusted MCQ array from a provider. Never throws. */
 export function parseLlmMcqs(raw: unknown): ParseResult<LlmMcq[]> {
-  const result = llmMcqListSchema.safeParse(raw);
-  if (result.success) return { success: true, data: result.data };
-  return {
-    success: false,
-    error: result.error.issues
-      .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
-      .join("; "),
-  };
+  return parseList(raw, llmMcqSchema);
 }
 
 /** Attach the system-controlled difficulty/format to a validated MCQ. */
@@ -77,14 +90,7 @@ export type LlmMulti = z.infer<typeof llmMultiSchema>;
 export const llmMultiListSchema = z.array(llmMultiSchema).min(1).max(20);
 
 export function parseLlmMulti(raw: unknown): ParseResult<LlmMulti[]> {
-  const result = llmMultiListSchema.safeParse(raw);
-  if (result.success) return { success: true, data: result.data };
-  return {
-    success: false,
-    error: result.error.issues
-      .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
-      .join("; "),
-  };
+  return parseList(raw, llmMultiSchema);
 }
 
 export function toGeneratedMultiQuestion(
@@ -115,14 +121,7 @@ export type LlmWritten = z.infer<typeof llmWrittenSchema>;
 export const llmWrittenListSchema = z.array(llmWrittenSchema).min(1).max(20);
 
 export function parseLlmWritten(raw: unknown): ParseResult<LlmWritten[]> {
-  const result = llmWrittenListSchema.safeParse(raw);
-  if (result.success) return { success: true, data: result.data };
-  return {
-    success: false,
-    error: result.error.issues
-      .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
-      .join("; "),
-  };
+  return parseList(raw, llmWrittenSchema);
 }
 
 export function toGeneratedWrittenQuestion(

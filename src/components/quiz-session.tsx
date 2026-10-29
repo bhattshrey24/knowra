@@ -91,9 +91,9 @@ export function QuizSession({
     setDifficulty(level);
     setStatus("loading");
     const controller = new AbortController();
-    // Above the server LLM timeout (Gemini ~30s, local Ollama up to 60s) so the
+    // Above the server LLM timeout (Gemini ~30s, local Ollama up to 90s) so the
     // server's mock fallback resolves before the client aborts.
-    const timer = setTimeout(() => controller.abort(), 65_000);
+    const timer = setTimeout(() => controller.abort(), 95_000);
     try {
       const res = await fetch("/api/quiz", {
         method: "POST",
