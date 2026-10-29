@@ -202,6 +202,46 @@ introduces accuracy-by-difficulty). Follow the dataviz guidance for new charts; 
 > mastery) — a small daily-snapshot table if we want real trend lines; otherwise accuracy-over-time
 > is the proxy. Keep all metric computation in the deterministic engine; charts only render it.
 
+## Phase 8 — Accounts & profiles (durable, cross-device logins) ⬜
+
+**The data layer is already multi-user.** Every user table has RLS (`auth.uid() = user_id`), a
+`profiles` table auto-creates on signup via the `handle_new_user` trigger, and `AuthBootstrap`
+signs each browser in **anonymously** — so two users already can't affect each other's knowledge
+base. The only gap is **durable, cross-device accounts**: today an account is a per-browser
+anonymous session that's lost on cookie-clear and can't follow the user to another device.
+
+Goal: real login so each user has a persistent, isolated profile, **without a signup wall** and at
+**$0**. No schema/RLS changes needed for isolation — this is mostly auth config + linking + UI.
+
+- ⬜ **8.1 Enable a free auth method:** Prefer **Google/GitHub OAuth** (one-click, no email
+  delivery, no rate limits, free) — register a free OAuth app, add client id/secret in Supabase.
+  _Alternative:_ email + password with email-confirmation disabled (also $0). Avoid built-in
+  magic-link/OTP at scale (free SMTP is rate-limited); wire Resend/custom SMTP only if we want it.
+- ⬜ **8.2 Anonymous → permanent linking:** Use Supabase `linkIdentity`/`updateUser` so a learner
+  who's been using the app anonymously **keeps their existing data** when they sign in (the anon
+  `user_id` becomes permanent — no row migration). `AuthBootstrap` stays; add an "upgrade this
+  session" step on sign-in.
+- ⬜ **8.3 Auth UI (anonymous-first):** Sign-in page/modal, a profile menu in the top bar
+  (avatar/name/sign-out), and an optional "Sign in to sync across devices" banner. **No login
+  wall** — keep anonymous-first for activation/demos.
+- ⬜ **8.4 Profiles & account hygiene:** Edit `display_name`/`avatar_url` (extend `profiles`);
+  delete-account (cascades via existing `on delete cascade`); basic settings.
+
+**Cost = $0:** Supabase Auth is free (≈50k monthly active users), OAuth is free, Vercel Hobby is
+free. No paid service introduced; the anon key stays public-safe, service-role stays server-only.
+
+**Capacity at $0 — the binding limit is DB storage (500 MB free), not auth.** Per-user footprint is
+dominated by `attempt_answers` storing full question text: heavy user ≈ 0.5–0.7 MB, typical ≈
+100–150 KB, light ≈ 30–50 KB → roughly **700–1,000 heavy / 3,000–5,000 typical / ~10,000 light**
+users on 500 MB. **One cheap trim multiplies this ~5×:** stop storing the question prompt/options
+text in `attempt_answers` (keep only `concept_id`, `is_correct`, `difficulty`, `created_at` — all
+the engine/analytics need) → heavy user ≈ 100 KB → **~5,000 heavy / 10,000+ typical**. Auth MAU
+(50k) and egress (5 GB/mo) bind only far later; Supabase Pro ($25/mo, 8 GB) scales to ~100k+.
+
+> **Caveats (not cost):** a free Supabase project **pauses after ~7 days idle** (needs steady
+> traffic, a keep-alive ping, or Pro for a live user base); decide **anonymous-first vs
+> login-required** (recommended: anonymous-first + upsell to link).
+
 ## MVP features (sequenced across phases; none removed)
 
 | #   | Feature                               | Phase     | Status | Notes                                                                                               |
