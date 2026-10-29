@@ -29,8 +29,8 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 - ✅ Dashboard knowledge profile (per-domain X/10 + accuracy) from real data (#8)
 - ✅ Weakness + foundational flashcards (#4): generated from quiz results (deterministic,
   de-duplicated), shown on the Flashcards page in distinct sections
-- 🟨 Needs user action to verify live: apply `0002`, enable Anonymous sign-ins (attempts + mastery
-  already verified live; take one more quiz to populate flashcards)
+- ✅ Live: all migrations `0001`–`0009` applied and Anonymous sign-ins enabled (2026-10-29). The
+  DB-backed flow (attempts → mastery → flashcards → concept mastery) runs end-to-end.
 
 ## Phase 3 — Spaced repetition & analytics 🟨
 
@@ -38,7 +38,7 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 - ✅ Migration `0003`: scheduling columns on flashcards (reps, ease, interval, due_at)
 - ✅ Review flow: "Due for review" session with Again/Hard/Good/Easy → `POST /api/flashcards/review`
   reschedules each card (#6)
-- 🟨 Needs user action: apply `0003`
+- ✅ Live: migration `0003` applied (see Phase 2 note). SM-2 review flow reschedules cards.
 - ✅ Analytics dashboard (#9): stat tiles + accuracy-over-time chart (hover + table fallback) +
   per-domain mastery with baseline→now learning gains (#13)
 
@@ -65,12 +65,16 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 - ⏸️ 5B: RAG / pgvector semantic retrieval — **deliberately deferred** (small corpus, embeddings
   cost); #10 is delivered via 5A. Design documented in `improve.md`.
 
-## Phase 6 — Concept-level taxonomy & adaptive mastery ⬜ (next — build step by step)
+## Phase 6 — Concept-level taxonomy & adaptive mastery 🟨 (code complete; verify live)
 
 Deepens the model from flat subjects to a `Subject → Topic → Concept` taxonomy so mastery,
 quizzing, and revision operate at the concept level. Extends the concept-level "later" notes on
 #2, #3, #7, #8, #12, #13, #14 — the LLM proposes classifications and questions; application logic
 validates every taxonomy relationship, question structure, answer key, and difficulty tag.
+
+**Status:** 6.1 ✅; 6.2–6.7 🟨 (code + unit tests complete, deterministic engines fully tested;
+DB-backed behaviour runs live now that migrations are applied — exercise it to confirm). The only
+MVP feature not started is the AI assistant (#5). Each sub-item below has its own detailed note.
 
 - ✅ **6.1 Hierarchy:** Model `Subject → Topic → Concept`. Every generated question is mapped to its
   underlying concept. Concepts may relate to multiple topics/subjects **without duplication**
@@ -162,28 +166,73 @@ validates every taxonomy relationship, question structure, answer key, and diffi
 > metadata. Keep all of this in the deterministic engine per the golden rules — the LLM never owns
 > taxonomy or scoring.
 
+## Phase 7 — Dashboard v2: deeper insights ⬜
+
+The dashboard is currently a **hybrid**: the concept/topic sections use the new hierarchy, but the
+headline stats, Focus areas, accuracy-over-time, and the **By subject** view still come from the
+legacy flat `domain_mastery`/`quiz_attempts.domain_slug` tables (so a subject number isn't the
+roll-up of its concepts). We also barely use the richest signals we already collect —
+`attempt_answers.concept_id`, per-attempt `difficulty`, timestamps, and flashcard SM-2 retention.
+This phase makes the whole dashboard concept-first and surfaces more meaningful progress insights.
+
+Recommended first slice: **7.1 + 7.2 + 7.3** (makes it concept-first, adds strengths/weaknesses,
+introduces accuracy-by-difficulty). Follow the dataviz guidance for new charts; keep the theme.
+
+- ⬜ **7.1 Unify on the hierarchy + drill-down:** Derive the subject view from concept aggregation
+  (`aggregateByLevel("subject")`) so Subject → Topic → Concept are one consistent, expandable tree
+  (tap a subject → its topics → its concepts). Each node shows mastery /10 **and a coverage bar**
+  ("explored 12 of 40 concepts"), reusing the `coverage` already computed.
+- ⬜ **7.2 Mastery distribution per subject:** A stacked bar / donut of how many concepts are
+  **weak / learning / mastered / unassessed** (reuse the `concept-selection` buckets) — strengths
+  as well as weaknesses, at a glance.
+- ⬜ **7.3 Accuracy by difficulty:** A 1–5 bar chart of accuracy at each difficulty (we store
+  per-attempt difficulty + correctness), visually separating **question difficulty** from
+  **mastery** (ties to 6.6).
+- ⬜ **7.4 Retention & revision panel:** Cards **due now**, a **"due over the next 7 days"** mini-bar,
+  and a **retention rate** (% recalled from reviews) — from `flashcards`/SM-2, today only on the
+  flashcards page.
+- ⬜ **7.5 Learning momentum:** A **streak** and a GitHub-style **weekly activity heatmap** from
+  `created_at`.
+- ⬜ **7.6 Knowledge-map radar:** A radar chart of mastery across engaged subjects — one picture of
+  breadth/balance.
+- ⬜ **7.7 Per-subject accuracy trend:** Filter the existing accuracy-over-time by subject instead
+  of one global line.
+
+> **Note:** A true **mastery-over-time** line needs historical snapshots (we only store _current_
+> mastery) — a small daily-snapshot table if we want real trend lines; otherwise accuracy-over-time
+> is the proxy. Keep all metric computation in the deterministic engine; charts only render it.
+
 ## MVP features (sequenced across phases; none removed)
 
-| #   | Feature                               | Phase | Status | Notes                                                                                         |
-| --- | ------------------------------------- | ----- | ------ | --------------------------------------------------------------------------------------------- |
-| 1   | Predefined domains homepage           | 1 / 2 | ✅     | Home → select domain → real generated quiz; attempts persisted (anon auth + Supabase).        |
-| 2   | Custom topic search                   | 4     | 🟨     | Quiz any typed topic; rolls up as its own subject. Verify live after `0004`.                  |
-| 3   | Adjustable difficulty 1–5 + recommend | 1 / 4 | ✅     | Select 1–5; system suggests a level from mastery (user overrides).                            |
-| 4   | Weakness detection + flashcards       | 2     | 🟨     | Weakness (wrong) + foundational (right) cards, distinctly tagged; verify live via a quiz.     |
-| 5   | AI learning assistant (chatbot)       | 6     | ⬜     | Optional; scoped to user's profile/mistakes.                                                  |
-| 6   | Spaced repetition + reminders         | 3     | 🟨     | SM-2 review flow reschedules cards; verify live after `0003`. Reminders later.                |
-| 7   | 80/20 prioritization                  | 4     | 🟨     | Dashboard focus areas rank weakest subjects; concept-level prioritization later.              |
-| 8   | Holistic knowledge profile            | 2     | 🟨     | Per-domain mastery (X/10) on dashboard; verify live after migration + anon auth.              |
-| 9   | Progress dashboard & analytics        | 3     | ✅     | Stat tiles, accuracy-over-time chart, per-domain mastery + learning gains.                    |
-| 10  | Cross-domain concept connections      | 5     | ✅     | Analogy flashcards link weak concepts to a known subject. Semantic RAG deferred (improve.md). |
-| 11  | Multiple question formats             | 1 / 4 | ✅     | MCQ + multi-select + written (free-text, graded). Format picker on the quiz screen.           |
-| 12  | Foundational gap detection            | 4     | 🟨     | Low-mastery "shore up the basics" hints; prerequisite-graph detection later.                  |
-| 13  | Baseline + long-term measurement      | 3     | 🟨     | Baseline→now gain per domain shown; richer retention (new Qs over time) later.                |
-| 14  | Progressive load management           | 4     | 🟨     | Recommended difficulty rises gradually with mastery/confidence; more to come.                 |
+| #   | Feature                               | Phase     | Status | Notes                                                                                               |
+| --- | ------------------------------------- | --------- | ------ | --------------------------------------------------------------------------------------------------- |
+| 1   | Predefined domains homepage           | 1 / 2     | ✅     | Redesigned taxonomy homepage (search + catalogue tabs + continue-learning); 24 subjects.            |
+| 2   | Custom topic search                   | 4 / 6     | ✅     | Search subjects/topics/concepts; no match → LLM search-create (6.3) classifies into taxonomy.       |
+| 3   | Adjustable difficulty 1–5 + recommend | 1 / 4 / 6 | ✅     | Adaptive-by-default (6.6) from mastery + recent perf; consistent level guidelines; manual override. |
+| 4   | Weakness detection + flashcards       | 2 / 6     | ✅     | Weakness/foundational/connection cards, concept-tagged; weakest-first revision.                     |
+| 5   | AI learning assistant (chatbot)       | 6         | ⬜     | **Not started** — the one remaining MVP feature. Scoped to user's profile/mistakes.                 |
+| 6   | Spaced repetition + reminders         | 3 / 6     | ✅     | Unified flip-and-rate review (SM-2); retention folds into concept mastery (6.7). Reminders later.   |
+| 7   | 80/20 prioritization                  | 4 / 6     | ✅     | Dashboard focus areas + concept-level balanced selection (weak/unassessed/retention) (6.2).         |
+| 8   | Holistic knowledge profile            | 2 / 6     | ✅     | Subject + concept→topic rollups + weakest concepts + uncertainty on dashboard (6.1/6.2).            |
+| 9   | Progress dashboard & analytics        | 3         | ✅     | Stat tiles, accuracy chart, mastery + gains. **Deeper insights planned in Phase 7.**                |
+| 10  | Cross-domain concept connections      | 5         | ✅     | Analogy flashcards link weak concepts to a known subject. Semantic RAG deferred (improve.md).       |
+| 11  | Multiple question formats             | 1 / 4     | ✅     | MCQ + multi-select + written; checkbox mix, count slider (5–30), timer.                             |
+| 12  | Foundational gap detection            | 4         | 🟨     | Low-mastery "shore up the basics" hints; prerequisite-graph detection still future.                 |
+| 13  | Baseline + long-term measurement      | 3         | 🟨     | Baseline→now gain per domain shown; mastery-over-time needs snapshots (Phase 7 note).               |
+| 14  | Progressive load management           | 4 / 6     | ✅     | Adaptive difficulty rises with mastery/confidence under a progressive-load cap.                     |
 
 ## Outstanding / blocked
 
-- **External setup needing user login:** Supabase cloud project (quiz attempts, profiles, mastery),
-  Vercel deployment. The default mock provider keeps everything runnable/verifiable without keys.
-- **Known Phase 1 limitation:** answers are scored client-side (correct indices are in the API
-  payload). Move scoring server-side once attempts persist (Phase 2/3). Tracked in `improve.md`.
+- **Supabase: done.** Cloud project connected, migrations `0001`–`0009` applied, Anonymous
+  sign-ins enabled (2026-10-29). DB-backed features run live. _Optional:_ seed the taxonomy into
+  the DB via `POST /api/admin/seed-taxonomy` (needs `SEED_TOKEN`); until then `getTaxonomy()` serves
+  the in-memory 24-subject seed.
+- **LLM provider:** default is local **Ollama** (`llama3.2:1b`) — works but slow/modest on CPU;
+  generation now runs in ≤6-question sequential chunks to avoid timeouts. A Gemini key is present
+  for a faster/higher-quality option (`LLM_PROVIDER=gemini`, drop the `GEMINI_MODEL` line).
+- **Still to do:** #5 AI assistant (not started); **Phase 7 Dashboard v2** (deeper insights); open a
+  PR from `feat/ollama-provider` into `main` (branch name no longer reflects its contents); Vercel
+  deployment (user's dashboard task).
+- **Known limitation:** answers are also scored client-side for instant feedback, but `/api/attempts`
+  **re-scores server-side** from the reference/answer key before persisting — so stored mastery is
+  trustworthy. Tracked in `improve.md`.
