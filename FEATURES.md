@@ -101,19 +101,32 @@ validates every taxonomy relationship, question structure, answer key, and diffi
   concept-aware: cards carry `concept_id` (migration `0009`), the study view shows the concept, and
   the Due-for-review queue is ordered weakest-concept-first (`orderByConceptWeakness`). **All of
   6.2's code is in; live verification needs migrations `0007`–`0009` applied + anon auth.**_
-- ⬜ **6.3 Search & create:** Homepage search bar over existing subjects/topics/concepts. If no
+- 🟨 **6.3 Search & create:** Homepage search bar over existing subjects/topics/concepts. If no
   match, the user describes what they want to learn; the LLM proposes a classification, checks for
-  duplicates and valid relationships, and the user can correct it before saving.
+  duplicates and valid relationships, and the user can correct it before saving. _Landed: LLM
+  `classify` behind the provider interface (mock/gemini/ollama, zod-validated); deterministic
+  `resolveClassification` (`learning/classify.ts`, unit-tested) matches proposed names to existing
+  nodes (reuse vs. new), detects duplicates, and mints collision-free slugs; `POST /api/classify`
+  proposes and `POST /api/learn` saves (re-resolved server-side, idempotent upserts via
+  `saveClassification`); `LearnCreate` lets the learner edit the Subject→Topic→Concept before
+  starting, then quizzes the new concept. `resolveLearnable` now resolves taxonomy subjects so
+  user-added ones are quizzable. Needs a real LLM + seeded DB to classify well live._
 - 🟨 **6.4 Initial taxonomy seed:** Seed the DB with a diverse, reasonably comprehensive set of
   subjects, topics, and concepts. The taxonomy expands as users explore new areas, **without
   creating duplicate entries**. _Landed: a 24-subject catalogue (~75 topics, ~215 concepts) across
   STEM, humanities, arts, social science, business and more (`taxonomy/seed.ts`, derived from
   `DOMAINS` so every subject is quizzable). Loading into the DB still needs migration `0007`
   applied + `POST /api/admin/seed-taxonomy`; until then `getTaxonomy()` serves this seed._
-- ⬜ **6.5 Adaptive diagnostics:** When a user picks an area with insufficient history, offer a
+- 🟨 **6.5 Adaptive diagnostics:** When a user picks an area with insufficient history, offer a
   short adaptive diagnostic to estimate concept-level mastery. Users may skip and start learning;
   mastery stays **uncertain** until there's enough evidence. Reuse reliable existing performance
-  data rather than re-assessing.
+  data rather than re-assessing. _Landed: deterministic engine (`learning/diagnostic.ts`,
+  unit-tested) — `needsDiagnostic` (coverage-based), `planDiagnostic` (probes only concepts lacking
+  evidence, reusing reliable ones, cycling difficulty), `isUncertain`. The quiz-start screen offers
+  a "quick diagnostic" on a thin subject (skippable); `/api/quiz` `diagnostic` mode probes
+  unassessed concepts; the dashboard flags low-confidence subjects/concepts as "Uncertain". Live
+  verification needs seeded concept history. Per-question varied difficulty within one generation
+  call is future work._
 - ⬜ **6.6 Difficulty calibration:** Separate **question difficulty** from **user mastery**.
   Difficulty 1–5 with consistent, concept-calibrated guidelines (concept + reasoning required).
   Recommend difficulty from diagnostics, mastery estimates, recent performance, and learning

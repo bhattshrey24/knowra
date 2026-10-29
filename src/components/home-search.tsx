@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CornerDownLeft, Loader2, Search, Sparkles } from "lucide-react";
+import { CornerDownLeft, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { LearnCreate } from "@/components/learn-create";
 import { quizHref, rankSearchItems, type SearchItem } from "@/lib/taxonomy/catalogue";
 import type { TaxonomyLevel } from "@/types/learning";
 
@@ -28,30 +29,10 @@ export function HomeSearch({
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [learnQuery, setLearnQuery] = useState<string | null>(null);
 
   const trimmed = query.trim();
   const matches = useMemo(() => rankSearchItems(items, trimmed), [items, trimmed]);
-
-  async function startCustomTopic() {
-    if (trimmed.length < 2 || creating) return;
-    setCreating(true);
-    try {
-      const res = await fetch("/api/topics", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title: trimmed }),
-      });
-      if (res.ok) {
-        const { slug } = (await res.json()) as { slug: string };
-        router.push(`/quiz/${slug}`);
-        return;
-      }
-    } catch {
-      // fall through to re-enable the button
-    }
-    setCreating(false);
-  }
 
   const showNoMatch = trimmed.length >= 2 && matches.length === 0;
 
@@ -116,30 +97,25 @@ export function HomeSearch({
         </ul>
       )}
 
-      {/* No taxonomy match → offer a custom topic */}
+      {/* No taxonomy match → classify it into the catalogue (6.3) */}
       {showNoMatch &&
         (canCreateCustom ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed p-4">
-            <p className="text-muted-foreground text-sm">
-              Nothing in the catalogue matches “{trimmed}”.
-            </p>
-            <Button onClick={startCustomTopic} disabled={creating}>
-              {creating ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Preparing…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="size-4" />
-                  Quiz me on “{trimmed}”
-                </>
-              )}
-            </Button>
-          </div>
+          learnQuery ? (
+            <LearnCreate query={learnQuery} onCancel={() => setLearnQuery(null)} />
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed p-4">
+              <p className="text-muted-foreground text-sm">
+                Nothing in the catalogue matches “{trimmed}”.
+              </p>
+              <Button onClick={() => setLearnQuery(trimmed)}>
+                <Sparkles className="size-4" />
+                Learn “{trimmed}”
+              </Button>
+            </div>
+          )
         ) : (
           <p className="text-muted-foreground rounded-xl border border-dashed p-4 text-sm">
-            Nothing matches “{trimmed}”. Custom topics need an account.
+            Nothing matches “{trimmed}”. Adding new topics needs an account.
           </p>
         ))}
     </div>

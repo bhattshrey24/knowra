@@ -69,6 +69,20 @@ export interface GradeWrittenResult {
   feedback: string;
 }
 
+export interface ClassifyInput {
+  /** What the learner typed, e.g. "Python decorators". */
+  query: string;
+  /** Existing subject names, so the model can reuse one rather than invent. */
+  subjects: string[];
+}
+
+/** An LLM-proposed Subject → Topic → Concept classification (names only). */
+export interface ClassifiedConcept {
+  subject: string;
+  topic: string;
+  concept: string;
+}
+
 /**
  * The contract every LLM backend implements. Returned content is always
  * schema-validated by the caller (zod) before it is stored or rendered —
@@ -80,4 +94,6 @@ export interface LLMProvider {
   generateFlashcards(input: GenerateFlashcardsInput): Promise<GeneratedFlashcard[]>;
   explain(input: ExplainInput): Promise<string>;
   gradeWritten(input: GradeWrittenInput): Promise<GradeWrittenResult>;
+  /** Propose where a free-text learning request fits in the taxonomy (#6.3). */
+  classify(input: ClassifyInput): Promise<ClassifiedConcept>;
 }

@@ -4,6 +4,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { buildTaxonomy, type Taxonomy, type TaxonomyInput } from "@/lib/learning/taxonomy";
 import { SEED_TAXONOMY } from "@/lib/taxonomy/seed";
 import { rowsToTaxonomy, taxonomyToRows, type TaxonomyRows } from "@/lib/taxonomy/rows";
+import type { ResolvedClassification } from "@/lib/learning/classify";
 
 /**
  * Data access for the shared taxonomy (Phase 6.1). Reads and writes use the
@@ -52,6 +53,44 @@ export async function seedTaxonomy(input: TaxonomyInput = SEED_TAXONOMY): Promis
     concepts: rows.concepts.length,
     conceptTopics: rows.conceptTopics.length,
   };
+}
+
+/**
+ * Persist a resolved classification into the shared taxonomy (Phase 6.3),
+ * creating any new subject/topic/concept and linking the concept to the topic.
+ * Idempotent upserts, so reusing existing nodes just ensures the link exists.
+ * Returns the ids to quiz on.
+ */
+export async function saveClassification(
+  r: ResolvedClassification,
+): Promise<{ subjectId: string; topicId: string; conceptId: string }> {
+  if (!isSupabaseConfigured()) throw new Error("Supabase is not configured");
+  const db = createAdminClient();
+
+  const subject = await db
+    .from("subjects")
+    .upsert({ id: r.subject.id, name: r.subject.name }, { onConflict: "id" });
+  if (subject.error) throw new Error(`save subject: ${subject.error.message}`);
+
+  const topic = await db
+    .from("topics")
+    .upsert({ id: r.topic.id, subject_id: r.subject.id, name: r.topic.name }, { onConflict: "id" });
+  if (topic.error) throw new Error(`save topic: ${topic.error.message}`);
+
+  const concept = await db
+    .from("concepts")
+    .upsert({ id: r.concept.id, name: r.concept.name }, { onConflict: "id" });
+  if (concept.error) throw new Error(`save concept: ${concept.error.message}`);
+
+  const link = await db
+    .from("concept_topics")
+    .upsert(
+      { concept_id: r.concept.id, topic_id: r.topic.id },
+      { onConflict: "concept_id,topic_id" },
+    );
+  if (link.error) throw new Error(`save link: ${link.error.message}`);
+
+  return { subjectId: r.subject.id, topicId: r.topic.id, conceptId: r.concept.id };
 }
 
 /**

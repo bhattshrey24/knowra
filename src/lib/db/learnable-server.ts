@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/db/server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { isCustomSlug, predefinedLearnable, type Learnable } from "@/lib/learnable";
+import { getTaxonomy } from "@/lib/db/taxonomy-server";
 
 /**
  * Resolve a slug to a learnable the current user may quiz on: a predefined
@@ -11,6 +12,19 @@ import { isCustomSlug, predefinedLearnable, type Learnable } from "@/lib/learnab
 export async function resolveLearnable(slug: string): Promise<Learnable | null> {
   const predefined = predefinedLearnable(slug);
   if (predefined) return predefined;
+
+  // A shared-taxonomy subject (including ones users added via 6.3 search-create).
+  const tax = await getTaxonomy();
+  const subject = tax.subjectById.get(slug);
+  if (subject) {
+    return {
+      slug: subject.id,
+      name: subject.name,
+      description: subject.description ?? "A subject in your catalogue.",
+      isCustom: false,
+    };
+  }
+
   if (!isCustomSlug(slug) || !isSupabaseConfigured()) return null;
 
   const supabase = await createClient();

@@ -10,6 +10,8 @@
  */
 
 import type {
+  ClassifiedConcept,
+  ClassifyInput,
   ExplainInput,
   GeneratedFlashcard,
   GeneratedQuestion,
@@ -18,6 +20,7 @@ import type {
   GradeWrittenResult,
   LLMProvider,
 } from "@/lib/llm/provider";
+import { parseClassified } from "@/lib/validation/classify";
 import {
   parseLlmMcqs,
   parseLlmMulti,
@@ -72,6 +75,11 @@ const FLASHCARD_SCHEMA = {
   type: "object",
   properties: { front: STRING, back: STRING },
   required: ["front", "back"],
+} as const;
+const CLASSIFY_SCHEMA = {
+  type: "object",
+  properties: { subject: STRING, topic: STRING, concept: STRING },
+  required: ["subject", "topic", "concept"],
 } as const;
 
 export class OllamaProvider implements LLMProvider {
@@ -128,6 +136,17 @@ export class OllamaProvider implements LLMProvider {
     };
     if (!raw?.front || !raw?.back) throw new Error("Ollama returned an invalid flashcard");
     return [{ type: input.type, front: raw.front, back: raw.back }];
+  }
+
+  async classify(input: ClassifyInput): Promise<ClassifiedConcept> {
+    const existing = input.subjects.join(", ") || "(none yet)";
+    const raw = await this.chatJson(
+      `Classify the learning request "${input.query}" into a Subject, Topic, and Concept for a study catalogue. Prefer an existing subject if it fits: ${existing}. Respond as JSON {subject, topic, concept} with short canonical names.`,
+      CLASSIFY_SCHEMA,
+    );
+    const parsed = parseClassified(raw);
+    if (!parsed.success) throw new Error(`Ollama invalid classification: ${parsed.error}`);
+    return parsed.data;
   }
 
   async explain(input: ExplainInput): Promise<string> {
