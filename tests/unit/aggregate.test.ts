@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateByLevel,
   foldConceptMastery,
+  weakestConcepts,
   type ConceptOutcome,
 } from "@/lib/learning/aggregate";
 import { INITIAL_MASTERY, updateMastery, type MasteryState } from "@/lib/learning/mastery";
@@ -73,5 +74,24 @@ describe("aggregateByLevel", () => {
     const bySubject = aggregateByLevel(new Map(), tax, "subject");
     const math = bySubject.get("math");
     expect(math).toMatchObject({ mastery: 0, attempts: 0, conceptsAssessed: 0, conceptsTotal: 3 });
+  });
+});
+
+describe("weakestConcepts", () => {
+  it("returns lowest-mastery concepts first, gated by min evidence", () => {
+    const byConcept = new Map<string, MasteryState>([
+      ["strong", { mastery: 0.9, confidence: 0.5, attempts: 4, correct: 4 }],
+      ["weak", { mastery: 0.2, confidence: 0.4, attempts: 3, correct: 1 }],
+      ["unproven", { mastery: 0.1, confidence: 0.1, attempts: 1, correct: 0 }], // too little evidence
+    ]);
+    expect(weakestConcepts(byConcept, 5)).toEqual(["weak", "strong"]);
+  });
+
+  it("honours the limit", () => {
+    const byConcept = new Map<string, MasteryState>([
+      ["a", { mastery: 0.1, confidence: 0.4, attempts: 3, correct: 0 }],
+      ["b", { mastery: 0.3, confidence: 0.4, attempts: 3, correct: 1 }],
+    ]);
+    expect(weakestConcepts(byConcept, 1)).toEqual(["a"]);
   });
 });
