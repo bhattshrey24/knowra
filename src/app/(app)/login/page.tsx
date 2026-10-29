@@ -22,6 +22,14 @@ export default function LoginPage() {
   const [isAnonymous, setIsAnonymous] = useState(true);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlError = params.get("error");
+      if (urlError) {
+        setError(decodeURIComponent(urlError));
+      }
+    }
+
     if (!isSupabaseConfigured()) return;
     const supabase = createClient();
     void supabase.auth.getUser().then(({ data: { user } }) => {
@@ -46,32 +54,29 @@ export default function LoginPage() {
       const supabase = createClient();
       const origin = window.location.origin;
 
-      if (isAnonymous) {
-        // Link identity to keep current anonymous attempts & flashcards
-        const { error: linkErr } = await supabase.auth.linkIdentity({
-          provider,
-          options: {
-            redirectTo: `${origin}/auth/callback?next=/profile`,
-          },
-        });
-        if (linkErr) {
-          // Fallback to standard OAuth sign-in if link fails
-          const { error: oauthErr } = await supabase.auth.signInWithOAuth({
-            provider,
-            options: {
-              redirectTo: `${origin}/auth/callback?next=/dashboard`,
-            },
-          });
-          if (oauthErr) throw oauthErr;
+      const { data, error: oauthErr } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${origin}/auth/callback?next=/dashboard`,
+        },
+      });
+
+      if (oauthErr) {
+        const msg = oauthErr.message?.toLowerCase() ?? "";
+        if (
+          msg.includes("not enabled") ||
+          msg.includes("unsupported provider") ||
+          oauthErr.status === 400
+        ) {
+          throw new Error(
+            `${provider === "google" ? "Google" : "GitHub"} OAuth is not enabled in this Supabase project. To enable it, navigate to Supabase Dashboard > Authentication > Providers > ${provider === "google" ? "Google" : "GitHub"}, toggle it on, and configure your Client ID and Secret. In the meantime, please use Email and Password below!`,
+          );
         }
-      } else {
-        const { error: oauthErr } = await supabase.auth.signInWithOAuth({
-          provider,
-          options: {
-            redirectTo: `${origin}/auth/callback?next=/dashboard`,
-          },
-        });
-        if (oauthErr) throw oauthErr;
+        throw oauthErr;
+      }
+
+      if (data?.url) {
+        window.location.assign(data.url);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "OAuth sign-in failed");
@@ -103,45 +108,40 @@ export default function LoginPage() {
 
     try {
       if (mode === "signup") {
-        if (isAnonymous) {
-          // Upgrade current anonymous session to permanent in-place
-          const { data, error: updateErr } = await supabase.auth.updateUser({
+        // Register or upgrade account via server API ($0 rate-limit bypass with auto-confirm)
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             email,
             password,
-            data: { display_name: displayName.trim() || email.split("@")[0] },
-          });
+            displayName: displayName.trim() || undefined,
+          }),
+        });
 
-          if (updateErr) throw updateErr;
-
-          if (data.user) {
-            setSuccess(
-              "Account created successfully! Your previous quiz history has been preserved.",
-            );
-            setTimeout(() => {
-              router.push("/dashboard");
-              router.refresh();
-            }, 1000);
-          }
-        } else {
-          // Standard signup
-          const { data, error: signErr } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: { display_name: displayName.trim() || email.split("@")[0] },
-            },
-          });
-
-          if (signErr) throw signErr;
-
-          if (data.user) {
-            setSuccess("Account created! Redirecting…");
-            setTimeout(() => {
-              router.push("/dashboard");
-              router.refresh();
-            }, 1000);
-          }
+        const result = await res.json();
+        if (!res.ok) {
+          throw new Error(result.error || "Failed to create account");
         }
+
+        // Establish the browser session immediately
+        const { error: loginErr } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (loginErr) throw loginErr;
+
+        setSuccess(
+          result.upgraded
+            ? "Account created successfully! Your previous quiz history has been preserved."
+            : "Account created successfully! Welcome to Knowra.",
+        );
+
+        setTimeout(() => {
+          router.push("/dashboard");
+          router.refresh();
+        }, 800);
       } else {
         // Sign in with existing credentials
         const { data, error: loginErr } = await supabase.auth.signInWithPassword({

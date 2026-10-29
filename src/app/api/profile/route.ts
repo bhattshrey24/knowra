@@ -18,11 +18,30 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
+  let profile: {
+    display_name?: string | null;
+    avatar_url?: string | null;
+    settings?: unknown;
+    created_at?: string;
+  } | null = null;
+
+  const { data, error } = await supabase
     .from("profiles")
     .select("display_name,avatar_url,settings,created_at")
     .eq("id", user.id)
     .maybeSingle();
+
+  if (error && error.message.includes("avatar_url")) {
+    // Fallback if migration 0010 (avatar_url) has not yet been applied to the hosted database
+    const { data: fallbackData } = await supabase
+      .from("profiles")
+      .select("display_name,settings,created_at")
+      .eq("id", user.id)
+      .maybeSingle();
+    profile = fallbackData;
+  } else {
+    profile = data;
+  }
 
   return NextResponse.json({
     id: user.id,

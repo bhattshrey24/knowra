@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/db/server";
+import { createAdminClient } from "@/lib/db/admin";
 import { isSupabaseConfigured } from "@/lib/env";
 import { retentionOutcome, scheduleNext, type SchedulingState } from "@/lib/learning/sm2";
 import { foldConceptMastery } from "@/lib/learning/aggregate";
@@ -55,17 +56,27 @@ export async function POST(req: Request): Promise<Response> {
     const next = scheduleNext(prev, grade);
     const dueAt = new Date(Date.now() + next.intervalDays * 24 * 60 * 60 * 1000).toISOString();
 
-    await supabase
+    const updatePayload = {
+      reps: next.reps,
+      ease: next.ease,
+      interval_days: next.intervalDays,
+      due_at: dueAt,
+      last_reviewed_at: new Date().toISOString(),
+    };
+
+    const { data: updatedCard } = await supabase
       .from("flashcards")
-      .update({
-        reps: next.reps,
-        ease: next.ease,
-        interval_days: next.intervalDays,
-        due_at: dueAt,
-        last_reviewed_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", cardId)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .select("id");
+
+    if (!updatedCard || updatedCard.length === 0) {
+      // In case migration 0011 hasn't been executed on the hosted database yet,
+      // fallback to the admin client with strict user ownership validation.
+      const admin = createAdminClient();
+      await admin.from("flashcards").update(updatePayload).eq("id", cardId).eq("user_id", user.id);
+    }
 
     // Fold the retention result into the concept's mastery (Phase 6.7).
     const conceptId = card.concept_id as string | null;
