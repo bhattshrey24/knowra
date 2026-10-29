@@ -38,6 +38,17 @@ describe("accuracyTimeline", () => {
     expect(points[2].accuracy).toBeCloseTo(0.8, 3);
     expect(points.map((p) => p.index)).toEqual([0, 1, 2]);
   });
+
+  it("filters points by domainSlug when specified (Phase 7.7)", () => {
+    const points = accuracyTimeline(attempts, "mathematics");
+    expect(points).toHaveLength(2);
+    expect(points.map((p) => p.createdAt)).toEqual([
+      "2026-10-01T10:00:00Z",
+      "2026-10-03T10:00:00Z",
+    ]);
+    expect(points[0].accuracy).toBeCloseTo(0.4, 3);
+    expect(points[1].accuracy).toBeCloseTo(0.8, 3);
+  });
 });
 
 describe("domainGains", () => {
