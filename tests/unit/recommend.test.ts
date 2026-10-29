@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { recommendDifficulty } from "@/lib/learning/recommend";
-import { INITIAL_MASTERY } from "@/lib/learning/mastery";
+import { recommendAdaptiveDifficulty, recommendDifficulty } from "@/lib/learning/recommend";
+import { INITIAL_MASTERY, type MasteryState } from "@/lib/learning/mastery";
 
 describe("recommendDifficulty", () => {
   it("eases beginners in when there's no history", () => {
@@ -33,5 +33,46 @@ describe("recommendDifficulty", () => {
       expect(d).toBeGreaterThanOrEqual(1);
       expect(d).toBeLessThanOrEqual(5);
     }
+  });
+});
+
+describe("recommendAdaptiveDifficulty", () => {
+  const confident = (mastery: number): MasteryState => ({
+    mastery,
+    confidence: 1,
+    attempts: 50,
+    correct: Math.round(mastery * 50),
+  });
+
+  it("defaults to the ease-in level with no history", () => {
+    expect(recommendAdaptiveDifficulty({})).toBe(2);
+  });
+
+  it("nudges up when recent work is easy", () => {
+    const base = recommendDifficulty(confident(0.5)); // 3
+    expect(recommendAdaptiveDifficulty({ mastery: confident(0.5), recentAccuracy: 0.95 })).toBe(
+      base + 1,
+    );
+  });
+
+  it("nudges down when recent work is hard", () => {
+    const base = recommendDifficulty(confident(0.5)); // 3
+    expect(recommendAdaptiveDifficulty({ mastery: confident(0.5), recentAccuracy: 0.2 })).toBe(
+      base - 1,
+    );
+  });
+
+  it("caps at 3 while the estimate is uncertain, even acing it", () => {
+    const uncertain: MasteryState = { mastery: 0.9, confidence: 0.2, attempts: 2, correct: 2 };
+    expect(recommendAdaptiveDifficulty({ mastery: uncertain, recentAccuracy: 1 })).toBe(3);
+  });
+
+  it("stays within 1..5", () => {
+    expect(
+      recommendAdaptiveDifficulty({ mastery: confident(1), recentAccuracy: 1 }),
+    ).toBeLessThanOrEqual(5);
+    expect(
+      recommendAdaptiveDifficulty({ mastery: confident(0), recentAccuracy: 0 }),
+    ).toBeGreaterThanOrEqual(1);
   });
 });
