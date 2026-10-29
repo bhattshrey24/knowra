@@ -241,7 +241,7 @@ the engine/analytics need) → heavy user ≈ 100 KB → **~5,000 heavy / 10,000
 | 6   | Spaced repetition + reminders         | 3 / 6     | ✅     | Unified flip-and-rate review (SM-2); retention folds into concept mastery (6.7). Reminders later.   |
 | 7   | 80/20 prioritization                  | 4 / 6     | ✅     | Dashboard focus areas + concept-level balanced selection (weak/unassessed/retention) (6.2).         |
 | 8   | Holistic knowledge profile            | 2 / 6     | ✅     | Subject + concept→topic rollups + weakest concepts + uncertainty on dashboard (6.1/6.2).            |
-| 9   | Progress dashboard & analytics        | 3         | ✅     | Stat tiles, accuracy chart, mastery + gains. **Deeper insights planned in Phase 7.**                |
+| 9   | Progress dashboard & analytics        | 3 / 7     | ✅     | Stat tiles, accuracy chart, hierarchy drilldown, radar, streak heatmap, difficulty accuracy.        |
 | 10  | Cross-domain concept connections      | 5         | ✅     | Analogy flashcards link weak concepts to a known subject. Semantic RAG deferred (improve.md).       |
 | 11  | Multiple question formats             | 1 / 4     | ✅     | MCQ + multi-select + written; checkbox mix, count slider (5–30), timer.                             |
 | 12  | Foundational gap detection            | 4         | 🟨     | Low-mastery "shore up the basics" hints; prerequisite-graph detection still future.                 |
@@ -250,16 +250,15 @@ the engine/analytics need) → heavy user ≈ 100 KB → **~5,000 heavy / 10,000
 
 ## Outstanding / blocked
 
-- **Supabase: done.** Cloud project connected, migrations `0001`–`0009` applied, Anonymous
+- **Supabase: done.** Cloud project connected, migrations `0001`–`0010` applied, Anonymous
   sign-ins enabled (2026-10-29). DB-backed features run live. _Optional:_ seed the taxonomy into
   the DB via `POST /api/admin/seed-taxonomy` (needs `SEED_TOKEN`); until then `getTaxonomy()` serves
   the in-memory 24-subject seed.
 - **LLM provider:** default is local **Ollama** (`llama3.2:1b`) — works but slow/modest on CPU;
   generation now runs in ≤6-question sequential chunks to avoid timeouts. A Gemini key is present
   for a faster/higher-quality option (`LLM_PROVIDER=gemini`, drop the `GEMINI_MODEL` line).
-- **Still to do:** #5 AI assistant (not started); **Phase 7 Dashboard v2** (deeper insights); open a
-  PR from `feat/ollama-provider` into `main` (branch name no longer reflects its contents); Vercel
-  deployment (user's dashboard task).
+- **Still to do:** #5 AI assistant (not started); open a PR from `feat/ollama-provider` into `main`
+  (branch name no longer reflects its contents); Vercel deployment (user's dashboard task).
 - **Known limitation:** answers are also scored client-side for instant feedback, but `/api/attempts`
   **re-scores server-side** from the reference/answer key before persisting — so stored mastery is
   trustworthy. Tracked in `improve.md`.
