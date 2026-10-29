@@ -77,8 +77,11 @@ validates every taxonomy relationship, question structure, answer key, and diffi
   quiz. Concepts may relate to multiple topics/subjects **without duplication** (shared concept,
   many links). _Landed: deterministic taxonomy engine (`src/lib/learning/taxonomy.ts`, unit-tested
   — validation + scope→concepts resolution), seed catalog (`src/lib/taxonomy/seed.ts`), shared-
-  taxonomy schema (migration `0007`, service-role writes / authenticated read). Next: load the seed
-  into the DB and tag generated questions with their concept._
+  taxonomy schema (migration `0007`, service-role writes / authenticated read), and the DB
+  access + idempotent seed loader (`db/taxonomy-server.ts` with pure round-trip-tested row mapping;
+  `getTaxonomy()` reads the DB catalog, falling back to the seed). Load it via
+  `POST /api/admin/seed-taxonomy` (guarded by `SEED_TOKEN`). Next: tag generated questions with
+  their concept and quiz at topic/concept level (6.2)._
 - ⬜ **6.2 Quizzing & revision at all three levels:** Let users quiz at subject, topic, or concept
   level. Track results at the concept level and aggregate up into topic- and subject-level stats
   for dashboards, flashcards, and revision. Subject-level quizzes **balance** weak concepts,
