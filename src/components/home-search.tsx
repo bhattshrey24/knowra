@@ -2,10 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Search, Sparkles } from "lucide-react";
+import { CornerDownLeft, Loader2, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 import { quizHref, rankSearchItems, type SearchItem } from "@/lib/taxonomy/catalogue";
 import type { TaxonomyLevel } from "@/types/learning";
 
@@ -58,21 +57,40 @@ export function HomeSearch({
 
   return (
     <div className="space-y-3">
-      <div className="relative">
-        <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2" />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search any subject, topic or concept…"
-          aria-label="Search any subject, topic or concept"
-          className="bg-background placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-ring/40 h-12 w-full rounded-xl border pr-3 pl-10 text-base transition-colors outline-none focus-visible:ring-2"
-        />
+      <div className="focus-within:border-primary/50 rounded-xl border p-3 transition-colors">
+        <div className="relative">
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search any subject, topic or concept…"
+            aria-label="Search any subject, topic or concept"
+            className="placeholder:text-muted-foreground h-8 w-full bg-transparent pr-2 pl-8 text-base outline-none"
+          />
+        </div>
+
+        {!trimmed && (
+          <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 border-t pt-2.5 text-sm">
+            <CornerDownLeft className="size-3.5" />
+            <span>Try:</span>
+            {EXAMPLES.map((example) => (
+              <button
+                key={example}
+                type="button"
+                onClick={() => setQuery(example)}
+                className="hover:text-foreground underline-offset-2 hover:underline"
+              >
+                {example}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Suggestions */}
       {matches.length > 0 && (
-        <ul className="divide-border overflow-hidden rounded-xl border">
+        <ul className="divide-y overflow-hidden rounded-xl border">
           {matches.map((item) => {
             const badge = LEVEL_BADGE[item.level];
             return (
@@ -80,7 +98,7 @@ export function HomeSearch({
                 <button
                   type="button"
                   onClick={() => router.push(quizHref(item))}
-                  className="hover:bg-muted flex w-full items-center justify-between gap-3 border-b px-4 py-2.5 text-left transition-colors last:border-b-0"
+                  className="hover:bg-muted flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors"
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium">{item.name}</span>
@@ -124,26 +142,6 @@ export function HomeSearch({
             Nothing matches “{trimmed}”. Custom topics need an account.
           </p>
         ))}
-
-      {/* Try: examples */}
-      {!trimmed && (
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <span className="text-muted-foreground text-sm">Try:</span>
-          {EXAMPLES.map((example) => (
-            <button
-              key={example}
-              type="button"
-              onClick={() => setQuery(example)}
-              className={cn(
-                "rounded-full border px-3 py-1 text-sm transition-colors",
-                "hover:border-primary/40 hover:bg-muted",
-              )}
-            >
-              {example}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

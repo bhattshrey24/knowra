@@ -2,7 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  BookOpen,
+  ChevronRight,
+  FlaskConical,
+  Globe2,
+  Landmark,
+  Music2,
+  Sigma,
+  type LucideIcon,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { quizHref, type Catalogue } from "@/lib/taxonomy/catalogue";
 
@@ -14,102 +24,145 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "concepts", label: "Concepts" },
 ];
 
-function NodeCard({
-  href,
-  title,
-  meta,
-  caption,
-}: {
-  href: string;
-  title: string;
-  meta?: string;
-  caption?: string;
-}) {
+/** How many cards each tab shows before "Browse all". */
+const LIMIT: Record<Tab, number> = { subjects: 4, topics: 6, concepts: 8 };
+
+const SUBJECT_ICONS: Record<string, LucideIcon> = {
+  mathematics: Sigma,
+  science: FlaskConical,
+  history: Landmark,
+  "world-politics": Globe2,
+  music: Music2,
+};
+
+/** A muted "A → B → C" hierarchy tag. */
+function Breadcrumb({ parts }: { parts: string[] }) {
   return (
-    <Link href={href} className="group focus:outline-none">
-      <Card className="group-hover:border-primary/40 group-focus-visible:border-primary h-full transition-colors">
-        <CardHeader className="pb-2">
-          {meta && (
-            <span className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
-              {meta}
-            </span>
-          )}
-          <CardTitle className="text-base">{title}</CardTitle>
-        </CardHeader>
-        {caption && <CardContent className="text-muted-foreground text-sm">{caption}</CardContent>}
-      </Card>
+    <span className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+      {parts.map((part, i) => (
+        <span key={i} className="flex items-center gap-1.5">
+          {i > 0 && <ChevronRight className="size-3 opacity-60" />}
+          {part}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** A full-width list row (topics/concepts) with a hierarchy breadcrumb. */
+function Row({ href, title, parts }: { href: string; title: string; parts: string[] }) {
+  return (
+    <Link
+      href={href}
+      className="hover:bg-muted flex items-center justify-between gap-3 px-4 py-3 transition-colors"
+    >
+      <span className="min-w-0 space-y-1">
+        <span className="block truncate text-sm font-medium">{title}</span>
+        <Breadcrumb parts={parts} />
+      </span>
+      <ChevronRight className="text-muted-foreground size-4 shrink-0" />
     </Link>
   );
 }
 
 export function CatalogueTabs({ catalogue }: { catalogue: Catalogue }) {
   const [tab, setTab] = useState<Tab>("subjects");
+  const [expanded, setExpanded] = useState(false);
   const { subjects, topics, concepts } = catalogue;
+
+  function switchTab(next: Tab) {
+    setTab(next);
+    setExpanded(false);
+  }
+
+  const total =
+    tab === "subjects" ? subjects.length : tab === "topics" ? topics.length : concepts.length;
+  const limit = expanded ? total : LIMIT[tab];
+  const hasMore = total > LIMIT[tab];
 
   return (
     <div className="space-y-4">
-      <div
-        role="tablist"
-        aria-label="Explore the catalogue"
-        className="bg-muted inline-flex rounded-lg p-1"
-      >
-        {TABS.map(({ id, label }) => (
-          <button
-            key={id}
-            role="tab"
-            type="button"
-            aria-selected={tab === id}
-            onClick={() => setTab(id)}
-            className={cn(
-              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-              tab === id
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {label}
-          </button>
-        ))}
+      <div role="tablist" aria-label="Explore the catalogue" className="grid grid-cols-3 gap-2">
+        {TABS.map(({ id, label }) => {
+          const active = tab === id;
+          return (
+            <button
+              key={id}
+              role="tab"
+              type="button"
+              aria-selected={active}
+              onClick={() => switchTab(id)}
+              className={cn(
+                "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                active
+                  ? "border-primary bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:border-primary/40 hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {tab === "subjects" && (
-        <div role="tabpanel" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {subjects.map((s) => (
-            <NodeCard
-              key={s.id}
-              href={quizHref({ level: "subject", id: s.id, subjectId: s.id })}
-              title={s.name}
-              caption={s.description ?? `${s.topicCount} topics · ${s.conceptCount} concepts`}
-            />
-          ))}
+        <div role="tabpanel" className="grid gap-3 sm:grid-cols-2">
+          {subjects.slice(0, limit).map((s) => {
+            const Icon = SUBJECT_ICONS[s.id] ?? BookOpen;
+            return (
+              <Link
+                key={s.id}
+                href={quizHref({ level: "subject", id: s.id, subjectId: s.id })}
+                className="hover:border-primary/40 group flex flex-col gap-2 rounded-xl border p-4 transition-colors"
+              >
+                <span className="bg-accent text-accent-foreground flex size-9 items-center justify-center rounded-lg">
+                  <Icon className="size-5" />
+                </span>
+                <span className="text-sm font-medium">{s.name}</span>
+                <span className="text-muted-foreground line-clamp-1 text-xs">
+                  {s.description ?? `${s.topicCount} topics · ${s.conceptCount} concepts`}
+                </span>
+              </Link>
+            );
+          })}
         </div>
       )}
 
       {tab === "topics" && (
-        <div role="tabpanel" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {topics.map((t) => (
-            <NodeCard
+        <div role="tabpanel" className="divide-y overflow-hidden rounded-xl border">
+          {topics.slice(0, limit).map((t) => (
+            <Row
               key={t.id}
               href={quizHref({ level: "topic", id: t.id, subjectId: t.subjectId })}
               title={t.name}
-              meta={t.subjectName}
-              caption={`${t.conceptCount} concept${t.conceptCount === 1 ? "" : "s"}`}
+              parts={[t.subjectName, t.name]}
             />
           ))}
         </div>
       )}
 
       {tab === "concepts" && (
-        <div role="tabpanel" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {concepts.map((c) => (
-            <NodeCard
+        <div role="tabpanel" className="divide-y overflow-hidden rounded-xl border">
+          {concepts.slice(0, limit).map((c) => (
+            <Row
               key={c.id}
               href={quizHref({ level: "concept", id: c.id, subjectId: c.subjects[0]?.id ?? "" })}
               title={c.name}
-              meta={[c.topics[0]?.name, c.subjects[0]?.name].filter(Boolean).join(" · ")}
+              parts={[c.subjects[0]?.name, c.topics[0]?.name, c.name].filter(Boolean) as string[]}
             />
           ))}
         </div>
+      )}
+
+      {hasMore && (
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+        >
+          {expanded ? "Show less" : `Browse all ${total} ${tab}`}
+        </Button>
       )}
     </div>
   );

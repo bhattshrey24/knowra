@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { HomeSearch } from "@/components/home-search";
 import { CatalogueTabs } from "@/components/catalogue-tabs";
 import { ContinueLearning, type ContinueLearningData } from "@/components/continue-learning";
@@ -18,7 +19,7 @@ interface MasteryRow extends MasteryState {
 
 /** Recent subjects (with progress) and cards due for revision, from real data. */
 async function loadContinueLearning(): Promise<ContinueLearningData> {
-  const empty: ContinueLearningData = { recent: [], revise: [] };
+  const empty: ContinueLearningData = { recent: [] };
   if (!isSupabaseConfigured()) return empty;
 
   const supabase = await createClient();
@@ -41,10 +42,10 @@ async function loadContinueLearning(): Promise<ContinueLearningData> {
       .eq("user_id", user.id),
     supabase
       .from("flashcards")
-      .select("id,domain_slug,front,due_at")
+      .select("domain_slug,due_at")
       .eq("user_id", user.id)
       .lte("due_at", now)
-      .limit(6),
+      .limit(200),
     customTitleMap(),
   ]);
 
@@ -53,7 +54,14 @@ async function loadContinueLearning(): Promise<ContinueLearningData> {
     ((masteryRes.data as MasteryRow[] | null) ?? []).map((m) => [m.domain_slug, m]),
   );
 
-  // Most-recent distinct subjects (up to 4), with their mastery.
+  // Count cards currently due, per subject.
+  const dueBySlug = new Map<string, number>();
+  for (const c of dueRes.data ?? []) {
+    const slug = c.domain_slug as string;
+    dueBySlug.set(slug, (dueBySlug.get(slug) ?? 0) + 1);
+  }
+
+  // Most-recent distinct subjects (up to 4), with their mastery and due count.
   const recent: ContinueLearningData["recent"] = [];
   const seen = new Set<string>();
   for (const a of attemptsRes.data ?? []) {
@@ -66,47 +74,47 @@ async function loadContinueLearning(): Promise<ContinueLearningData> {
       name: name(slug),
       outOfTen: m ? masteryOutOfTen(m) : 0,
       accuracy: m && m.attempts ? Math.round((m.correct / m.attempts) * 100) : 0,
+      dueCount: dueBySlug.get(slug) ?? 0,
     });
     if (recent.length >= 4) break;
   }
 
-  const revise = (dueRes.data ?? []).map((c) => ({
-    id: c.id as string,
-    front: c.front as string,
-    hint: name(c.domain_slug as string),
-  }));
-
-  return { recent, revise };
+  return { recent };
 }
 
 export default async function HomePage() {
   const [tax, cont] = await Promise.all([getTaxonomy(), loadContinueLearning()]);
   const catalogue = buildCatalogue(tax);
-  const hasHistory = cont.recent.length > 0 || cont.revise.length > 0;
+  const hasHistory = cont.recent.length > 0;
 
   return (
     <div className="space-y-10">
       <div className="space-y-5">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">What do you want to learn?</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">What will you learn today?</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Search the catalogue or type anything. Knowra learns what you know from how you answer.
+            Explore something new or strengthen what you already know.
           </p>
         </div>
         <HomeSearch items={catalogue.searchItems} canCreateCustom={isSupabaseConfigured()} />
       </div>
 
-      {hasHistory && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-medium">Continue learning</h2>
-          <ContinueLearning data={cont} />
-        </section>
-      )}
-
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Explore the catalogue</h2>
         <CatalogueTabs catalogue={catalogue} />
       </section>
+
+      {hasHistory && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-medium">Continue learning</h2>
+            <Link href="/dashboard" className="text-primary text-sm font-medium hover:underline">
+              View all
+            </Link>
+          </div>
+          <ContinueLearning data={cont} />
+        </section>
+      )}
     </div>
   );
 }
