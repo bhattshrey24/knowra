@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { INITIAL_SCHEDULING, scheduleNext, type SchedulingState } from "@/lib/learning/sm2";
+import {
+  INITIAL_SCHEDULING,
+  retentionOutcome,
+  scheduleNext,
+  type SchedulingState,
+} from "@/lib/learning/sm2";
+
+describe("retentionOutcome", () => {
+  it("counts a lapse (again) as incorrect, recalls as correct", () => {
+    expect(retentionOutcome("again").correct).toBe(false);
+    expect(retentionOutcome("hard").correct).toBe(true);
+    expect(retentionOutcome("good").correct).toBe(true);
+    expect(retentionOutcome("easy").correct).toBe(true);
+    expect(retentionOutcome("good").difficulty).toBe(3);
+  });
+});
 
 describe("scheduleNext (SM-2)", () => {
   it("schedules the classic 1 → 6 → interval*ease progression on 'good'", () => {

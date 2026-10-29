@@ -5,6 +5,86 @@ Newest first.
 
 ---
 
+## 2026-10-29 — Phase 6 (6.1–6.7) + UI redesigns + Ollama reliability
+
+Large multi-feature session on branch **`feat/ollama-provider`** (name now outdated — it holds all
+of the below, not just the Ollama provider). `pnpm check` stayed green throughout (≈168–169 unit/
+integration tests; test count grew from 80 → 169). Every deterministic engine is unit-tested; all
+engine logic is LLM-independent per the golden rules.
+
+**Completed — Phase 6, concept-level taxonomy & adaptive mastery (test-first):**
+
+- **6.1 Hierarchy** — `learning/taxonomy.ts` (validation + `conceptsForScope`); seed catalogue;
+  migration `0007` (shared `subjects`/`topics`/`concepts`/`concept_topics`, authenticated read /
+  service-role writes); DB loader `db/taxonomy-server.ts` with `getTaxonomy()` (DB catalogue or
+  in-memory seed); every question concept-tagged — LLM proposes a label, app validates it
+  (`learning/concept-tagging.ts`, round-robin fallback). `POST /api/admin/seed-taxonomy`
+  (`SEED_TOKEN`-guarded) loads the seed into the DB.
+- **6.2 Concept tracking + balancing** — `learning/aggregate.ts` (`foldConceptMastery`,
+  `aggregateByLevel` concept→topic→subject, `weakestConcepts`); migration `0008` (`concept_mastery`
+  - `attempt_answers.concept_id`); `/api/attempts` records concept outcomes; balanced subject/topic
+    selection (`learning/concept-selection.ts`: weak/unassessed/retention, `MIN_EVIDENCE` gate);
+    dashboard gains "By topic" rollups + "Weakest concepts".
+- **6.3 Search-create** — LLM `classify` on the provider interface (mock/gemini/ollama, zod-
+  validated); `learning/classify.ts` `resolveClassification` (reuse-vs-new, dedup, collision-free
+  slugs); `POST /api/classify` (propose) + `POST /api/learn` (save, idempotent upserts);
+  `LearnCreate` UI (edit Subject→Topic→Concept, New/Existing badges). `resolveLearnable` now
+  resolves taxonomy subjects, so user-added subjects are quizzable.
+- **6.4 Seed** — expanded to **24 subjects / ~75 topics / ~215 concepts**, derived from `DOMAINS`
+  (single source → every subject quizzable; `seed == DOMAINS` test holds).
+- **6.5 Diagnostics** — `learning/diagnostic.ts` (`needsDiagnostic`, `planDiagnostic`, `isUncertain`);
+  quiz-start offers a skippable diagnostic; `/api/quiz` `diagnostic` mode probes unassessed
+  concepts; dashboard "Uncertain" badges.
+- **6.6 Difficulty calibration** — `learning/difficulty.ts` guidelines fed into gen prompts;
+  `recommendAdaptiveDifficulty` (mastery band + recent accuracy, progressive-load cap); quiz-start
+  **Adaptive by default** with manual 1–5 override.
+- **6.7 Learner profile** — flashcard reviews fold retention into concept mastery (`sm2.retentionOutcome`).
+
+**Completed — UI work (earlier in the session):** theme toggle (light/dark/system, anti-flash);
+quiz options (format checkbox multi-select → mixed quizzes, 5–30 question slider, countdown timer);
+flashcards redesign (due banner, All/Due filter, Subjects/Topics/Concepts browse) and a **unified
+flip-and-rate review** (`FlashcardReview`) that replaced the separate `FlashcardStudy` +
+`ReviewSession`; **taxonomy homepage** (prominent search + "Try:" + live suggestions, catalogue
+tabs with breadcrumbs, Continue-learning from real data).
+
+**Issues encountered + fixes:**
+
+- **Ollama quiz timeouts / dummy (mock) fallback.** Root causes and fixes: (a) a single malformed
+  question made the whole batch fail → `parseLlm*` now validate per item and keep the valid ones
+  (`validation/question.ts`); (b) cold model reload → send `keep_alive: "10m"`; (c) one oversized
+  LLM call exceeded the timeout → generate in **≤6-question sequential chunks** (`generateMix`),
+  cap to requested count; raised Ollama per-call timeout 60→90s and client abort 65→150s. Isolated
+  timings: ~17s plain / ~31s structured per 6-question Ollama call (trust these — my end-to-end
+  timing runs were unreliable; the test machine OOM-killed a server running build+server+ollama at
+  once).
+- `Map` lucide icon shadowed the global `Map` constructor → aliased to `MapIcon` in
+  `lib/subject-icons.ts`.
+
+**Key decisions:** global shared taxonomy (service-role writes); additive/incremental rollout (app
+never broke); concept tagging = LLM-proposed label + deterministic app validation, one call per
+format (Ollama-friendly) not per concept; AI assistant (#5) deliberately set aside at the user's
+request.
+
+**Current state (session close):** working tree has **uncommitted `FEATURES.md`** (added Phase 7
+Dashboard-v2 roadmap + refreshed statuses) and **3 unpushed commits** (`3bb15ed`, `5ef55d6`,
+`9ea918b` — the quiz reliability fixes). Supabase is **live** (migrations `0001`–`0009` applied,
+Anonymous sign-ins on, 2026-10-29). LLM = local **Ollama `llama3.2:1b`** (slow/modest; Gemini key
+present for a faster option).
+
+**Exact next steps:**
+
+1. **Commit** the `FEATURES.md` update and **`git push origin feat/ollama-provider`** (3 quiz-fix
+   commits + the docs are currently local).
+2. Pick the next build: **Phase 7 Dashboard v2** (recommended first slice **7.1 + 7.2 + 7.3** —
+   make the dashboard concept-first + mastery distribution + accuracy-by-difficulty; spec in
+   `FEATURES.md`) **or** **#5 AI assistant** (not started).
+3. **Open a PR** `feat/ollama-provider` → `main` (the branch holds far more than the Ollama
+   provider now; consider renaming or just note it in the PR).
+4. Optional: load the taxonomy into the DB (`POST /api/admin/seed-taxonomy` with `SEED_TOKEN`); or
+   switch `LLM_PROVIDER=gemini` (drop the `GEMINI_MODEL` line) for faster, higher-quality questions.
+
+---
+
 ## 2026-10-27 — Phase 5A: cross-domain analogy flashcards (#10)
 
 **Completed** (branch `feat/phase-5a-connections`, test-first) — `connections.ts` (unit-tested):

@@ -108,10 +108,18 @@ async function conceptsForQuiz(
 }
 
 /**
+ * Max questions requested per LLM call. Large quizzes are generated in several
+ * small sequential calls instead of one big one, so no single call runs long
+ * enough to time out — important for slow local models, where one oversized
+ * request would exceed the provider timeout and dead-end the whole quiz.
+ */
+const MAX_PER_CALL = 6;
+
+/**
  * Generate a mixed-format quiz: split the count across the selected formats
- * (deterministically), request each batch from the provider in parallel, then
- * interleave so the formats alternate. Reuses each provider's existing
- * single-format generation path unchanged.
+ * (deterministically), generate each format in small sequential chunks, then
+ * interleave so the formats alternate. Sequential (not parallel) so a
+ * single-instance local model isn't asked to run several generations at once.
  */
 async function generateMix(
   provider: LLMProvider,
@@ -119,12 +127,24 @@ async function generateMix(
   formats: QuestionFormat[],
 ): Promise<Awaited<ReturnType<LLMProvider["generateQuestions"]>>> {
   const counts = allocateFormatCounts(base.count, formats);
-  const batches = await Promise.all(
-    Object.entries(counts).map(([format, count]) =>
-      provider.generateQuestions({ ...base, formats: [format as QuestionFormat], count }),
-    ),
-  );
-  return interleaveByFormat(batches.flat(), base.count, formats);
+  const all: Awaited<ReturnType<LLMProvider["generateQuestions"]>> = [];
+
+  for (const [format, count] of Object.entries(counts)) {
+    let remaining = count;
+    while (remaining > 0) {
+      const chunk = Math.min(remaining, MAX_PER_CALL);
+      const batch = await provider.generateQuestions({
+        ...base,
+        formats: [format as QuestionFormat],
+        count: chunk,
+      });
+      all.push(...batch);
+      remaining -= chunk;
+    }
+  }
+
+  // Interleave and cap to the requested count (models can over-generate).
+  return interleaveByFormat(all, base.count, formats).slice(0, base.count);
 }
 
 function clientKey(req: Request): string {

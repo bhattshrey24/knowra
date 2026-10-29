@@ -29,6 +29,7 @@ import {
   toGeneratedQuestion,
   toGeneratedWrittenQuestion,
 } from "@/lib/validation/question";
+import { difficultyGuideline } from "@/lib/learning/difficulty";
 import { conceptClause } from "@/lib/llm/concept-prompt";
 
 type FetchFn = typeof fetch;
@@ -89,12 +90,14 @@ export class OllamaProvider implements LLMProvider {
     private readonly baseUrl = "http://localhost:11434",
     private readonly model = "llama3.2",
     private readonly fetchFn: FetchFn = fetch,
-    private readonly timeoutMs = 60_000,
+    // Generous for slow local CPU inference, especially a cold first request.
+    // Override with OLLAMA_TIMEOUT_MS.
+    private readonly timeoutMs = 90_000,
   ) {}
 
   async generateQuestions(input: GenerateQuestionsInput): Promise<GeneratedQuestion[]> {
     const format = input.formats[0] ?? "mcq";
-    const context = `"${input.conceptName}" (topic: ${input.topicName}, subject: ${input.domainName}) at difficulty ${input.difficulty}/5`;
+    const context = `"${input.conceptName}" (topic: ${input.topicName}, subject: ${input.domainName}) at difficulty ${input.difficulty}/5 (that level should ${difficultyGuideline(input.difficulty)})`;
 
     if (format === "written") {
       const raw = await this.chatJson(
@@ -194,6 +197,8 @@ export class OllamaProvider implements LLMProvider {
         model: this.model,
         messages: [{ role: "user", content: prompt }],
         stream: false,
+        // Keep the model resident so the next request isn't a cold start.
+        keep_alive: "10m",
       }),
     );
     if (!res.ok) throw new Error(`Ollama request failed: ${res.status}`);
@@ -208,6 +213,8 @@ export class OllamaProvider implements LLMProvider {
         stream: false,
         format,
         options: { temperature: 0.6 },
+        // Keep the model resident so the next request isn't a cold start.
+        keep_alive: "10m",
       }),
     );
     if (!res.ok) throw new Error(`Ollama request failed: ${res.status}`);
