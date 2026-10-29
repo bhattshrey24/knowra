@@ -166,43 +166,31 @@ MVP feature not started is the AI assistant (#5). Each sub-item below has its ow
 > metadata. Keep all of this in the deterministic engine per the golden rules — the LLM never owns
 > taxonomy or scoring.
 
-## Phase 7 — Dashboard v2: deeper insights ⬜
+## Phase 7 — Dashboard v2: deeper insights ✅
 
-The dashboard is currently a **hybrid**: the concept/topic sections use the new hierarchy, but the
-headline stats, Focus areas, accuracy-over-time, and the **By subject** view still come from the
-legacy flat `domain_mastery`/`quiz_attempts.domain_slug` tables (so a subject number isn't the
-roll-up of its concepts). We also barely use the richest signals we already collect —
-`attempt_answers.concept_id`, per-attempt `difficulty`, timestamps, and flashcard SM-2 retention.
-This phase makes the whole dashboard concept-first and surfaces more meaningful progress insights.
+The dashboard is now concept-first and derives all progress signals from the underlying taxonomy and evidence.
+All metric computation lives in the deterministic engine (`src/lib/learning/analytics.ts`), covered by unit tests.
 
-Recommended first slice: **7.1 + 7.2 + 7.3** (makes it concept-first, adds strengths/weaknesses,
-introduces accuracy-by-difficulty). Follow the dataviz guidance for new charts; keep the theme.
-
-- ⬜ **7.1 Unify on the hierarchy + drill-down:** Derive the subject view from concept aggregation
-  (`aggregateByLevel("subject")`) so Subject → Topic → Concept are one consistent, expandable tree
-  (tap a subject → its topics → its concepts). Each node shows mastery /10 **and a coverage bar**
-  ("explored 12 of 40 concepts"), reusing the `coverage` already computed.
-- ⬜ **7.2 Mastery distribution per subject:** A stacked bar / donut of how many concepts are
-  **weak / learning / mastered / unassessed** (reuse the `concept-selection` buckets) — strengths
-  as well as weaknesses, at a glance.
-- ⬜ **7.3 Accuracy by difficulty:** A 1–5 bar chart of accuracy at each difficulty (we store
-  per-attempt difficulty + correctness), visually separating **question difficulty** from
-  **mastery** (ties to 6.6).
-- ⬜ **7.4 Retention & revision panel:** Cards **due now**, a **"due over the next 7 days"** mini-bar,
-  and a **retention rate** (% recalled from reviews) — from `flashcards`/SM-2, today only on the
-  flashcards page.
-- ⬜ **7.5 Learning momentum:** A **streak** and a GitHub-style **weekly activity heatmap** from
-  `created_at`.
-- ⬜ **7.6 Knowledge-map radar:** A radar chart of mastery across engaged subjects — one picture of
-  breadth/balance.
-- ⬜ **7.7 Per-subject accuracy trend:** Filter the existing accuracy-over-time by subject instead
-  of one global line.
+- ✅ **7.1 Unify on the hierarchy + drill-down:** Derived the subject view from concept aggregation
+  (`aggregateByLevel("subject")`). Subject → Topic → Concept is an expandable tree (`DashboardHierarchy`),
+  where each node shows mastery /10 and coverage ("explored X of Y concepts").
+- ✅ **7.2 Mastery distribution per subject:** Stacked distribution bar (`DistributionBar`) showing counts and
+  percentages for **weak / learning / mastered / unassessed** concepts for each subject at a glance.
+- ✅ **7.3 Accuracy by difficulty:** 1–5 bar chart (`DifficultyAccuracyChart`) comparing accuracy at each difficulty
+  level, visually separating **question difficulty** from **mastery**.
+- ✅ **7.4 Retention & revision panel:** Spaced repetition panel (`RetentionPanel`) displaying cards **due now**,
+  a **7-day forecast distribution**, and the SM-2 **retention rate**.
+- ✅ **7.5 Learning momentum:** Daily study **streak** with longest streak tracking and a 4-week GitHub-style
+  **activity heatmap** (`ActivityHeatmap`).
+- ✅ **7.6 Knowledge-map radar:** SVG radar chart (`KnowledgeRadar`) showing mastery breadth/balance across engaged subjects.
+- ✅ **7.7 Per-subject accuracy trend:** `AccuracyChart` now features a subject filter to inspect the accuracy timeline
+  for individual subjects as well as all subjects.
 
 > **Note:** A true **mastery-over-time** line needs historical snapshots (we only store _current_
 > mastery) — a small daily-snapshot table if we want real trend lines; otherwise accuracy-over-time
 > is the proxy. Keep all metric computation in the deterministic engine; charts only render it.
 
-## Phase 8 — Accounts & profiles (durable, cross-device logins) ⬜
+## Phase 8 — Accounts & profiles (durable, cross-device logins) ✅
 
 **The data layer is already multi-user.** Every user table has RLS (`auth.uid() = user_id`), a
 `profiles` table auto-creates on signup via the `handle_new_user` trigger, and `AuthBootstrap`
@@ -213,19 +201,18 @@ anonymous session that's lost on cookie-clear and can't follow the user to anoth
 Goal: real login so each user has a persistent, isolated profile, **without a signup wall** and at
 **$0**. No schema/RLS changes needed for isolation — this is mostly auth config + linking + UI.
 
-- ⬜ **8.1 Enable a free auth method:** Prefer **Google/GitHub OAuth** (one-click, no email
-  delivery, no rate limits, free) — register a free OAuth app, add client id/secret in Supabase.
-  _Alternative:_ email + password with email-confirmation disabled (also $0). Avoid built-in
-  magic-link/OTP at scale (free SMTP is rate-limited); wire Resend/custom SMTP only if we want it.
-- ⬜ **8.2 Anonymous → permanent linking:** Use Supabase `linkIdentity`/`updateUser` so a learner
-  who's been using the app anonymously **keeps their existing data** when they sign in (the anon
-  `user_id` becomes permanent — no row migration). `AuthBootstrap` stays; add an "upgrade this
-  session" step on sign-in.
-- ⬜ **8.3 Auth UI (anonymous-first):** Sign-in page/modal, a profile menu in the top bar
-  (avatar/name/sign-out), and an optional "Sign in to sync across devices" banner. **No login
-  wall** — keep anonymous-first for activation/demos.
-- ⬜ **8.4 Profiles & account hygiene:** Edit `display_name`/`avatar_url` (extend `profiles`);
-  delete-account (cascades via existing `on delete cascade`); basic settings.
+- ✅ **8.1 Enable a free auth method:** OAuth (Google & GitHub) via standard Supabase redirect flow and code exchange route (`/auth/callback`), plus Email/Password signup & signin.
+- ✅ **8.2 Anonymous → permanent linking:** When signing up or linking from an anonymous session, calls Supabase `updateUser({ email, password, data })` / `linkIdentity`, preserving the current user's `id` and keeping all attempts, mastery records, and flashcards intact without manual row migration.
+- ✅ **8.3 Auth UI (anonymous-first):**
+  - Sign-in page (`/login`) with tabbed Email vs OAuth sign-in/up and anonymous account upgrade detection.
+  - Top-bar ProfileMenu in `AppNav` showing user initials/avatar, display name, Guest/Permanent badge, links to `/profile`, and sign-out.
+  - Dismissible `AuthSyncBanner` on `/dashboard` nudging anonymous learners to secure their learning data.
+  - Zero login wall: guest sessions still auto-created via `AuthBootstrap`.
+- ✅ **8.4 Profiles & account hygiene:**
+  - Editable display name with Zod validation via `GET`/`PATCH /api/profile`.
+  - Migration `0010_profile_avatar.sql` adds optional `avatar_url`.
+  - Account deletion (`DELETE /api/profile`) using admin Supabase client cascading through all user attempts, mastery, and flashcards.
+  - Full settings UI on `/profile`.
 
 **Cost = $0:** Supabase Auth is free (≈50k monthly active users), OAuth is free, Vercel Hobby is
 free. No paid service introduced; the anon key stays public-safe, service-role stays server-only.
@@ -254,7 +241,7 @@ the engine/analytics need) → heavy user ≈ 100 KB → **~5,000 heavy / 10,000
 | 6   | Spaced repetition + reminders         | 3 / 6     | ✅     | Unified flip-and-rate review (SM-2); retention folds into concept mastery (6.7). Reminders later.   |
 | 7   | 80/20 prioritization                  | 4 / 6     | ✅     | Dashboard focus areas + concept-level balanced selection (weak/unassessed/retention) (6.2).         |
 | 8   | Holistic knowledge profile            | 2 / 6     | ✅     | Subject + concept→topic rollups + weakest concepts + uncertainty on dashboard (6.1/6.2).            |
-| 9   | Progress dashboard & analytics        | 3         | ✅     | Stat tiles, accuracy chart, mastery + gains. **Deeper insights planned in Phase 7.**                |
+| 9   | Progress dashboard & analytics        | 3 / 7     | ✅     | Stat tiles, accuracy chart, hierarchy drilldown, radar, streak heatmap, difficulty accuracy.        |
 | 10  | Cross-domain concept connections      | 5         | ✅     | Analogy flashcards link weak concepts to a known subject. Semantic RAG deferred (improve.md).       |
 | 11  | Multiple question formats             | 1 / 4     | ✅     | MCQ + multi-select + written; checkbox mix, count slider (5–30), timer.                             |
 | 12  | Foundational gap detection            | 4         | 🟨     | Low-mastery "shore up the basics" hints; prerequisite-graph detection still future.                 |
@@ -263,16 +250,15 @@ the engine/analytics need) → heavy user ≈ 100 KB → **~5,000 heavy / 10,000
 
 ## Outstanding / blocked
 
-- **Supabase: done.** Cloud project connected, migrations `0001`–`0009` applied, Anonymous
+- **Supabase: done.** Cloud project connected, migrations `0001`–`0010` applied, Anonymous
   sign-ins enabled (2026-10-29). DB-backed features run live. _Optional:_ seed the taxonomy into
   the DB via `POST /api/admin/seed-taxonomy` (needs `SEED_TOKEN`); until then `getTaxonomy()` serves
   the in-memory 24-subject seed.
 - **LLM provider:** default is local **Ollama** (`llama3.2:1b`) — works but slow/modest on CPU;
   generation now runs in ≤6-question sequential chunks to avoid timeouts. A Gemini key is present
   for a faster/higher-quality option (`LLM_PROVIDER=gemini`, drop the `GEMINI_MODEL` line).
-- **Still to do:** #5 AI assistant (not started); **Phase 7 Dashboard v2** (deeper insights); open a
-  PR from `feat/ollama-provider` into `main` (branch name no longer reflects its contents); Vercel
-  deployment (user's dashboard task).
+- **Still to do:** #5 AI assistant (not started); open a PR from `feat/ollama-provider` into `main`
+  (branch name no longer reflects its contents); Vercel deployment (user's dashboard task).
 - **Known limitation:** answers are also scored client-side for instant feedback, but `/api/attempts`
   **re-scores server-side** from the reference/answer key before persisting — so stored mastery is
   trustworthy. Tracked in `improve.md`.

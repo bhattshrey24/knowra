@@ -81,6 +81,8 @@ test("a timed quiz auto-submits when the countdown runs out", async ({ page }) =
 
 test("difficulty can be chosen before starting", async ({ page }) => {
   await page.goto("/quiz/science");
+  // Switch from adaptive (default) to manual difficulty selection
+  await page.getByRole("button", { name: /Choose yourself/ }).click();
   const hard = page.getByRole("button", { name: "Difficulty 4: Hard" });
   await hard.click();
   await expect(hard).toHaveAttribute("aria-pressed", "true");

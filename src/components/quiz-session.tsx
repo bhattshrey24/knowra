@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Clock, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
+import { Check, Clock, RotateCcw, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -77,6 +77,22 @@ export function QuizSession({
   const [written, setWritten] = useState<Record<string, string>>({});
   const [summary, setSummary] = useState<QuizSummary | null>(null);
   const [fallback, setFallback] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [isDiagnostic, setIsDiagnostic] = useState(false);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+  const userCancelledRef = useRef(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
+  }, []);
 
   function toggleFormat(value: QuizFormat) {
     setFormats((prev) =>
@@ -84,13 +100,50 @@ export function QuizSession({
     );
   }
 
+  function cancelQuiz() {
+    userCancelledRef.current = true;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
+    setStatus("setup");
+    setProgress(0);
+  }
+
   async function startQuiz(opts?: { diagnostic?: boolean }) {
     if (formats.length === 0) return;
     // Adaptive uses the recommended level; the active view shows it too.
     const level: Difficulty = adaptive ? adaptiveLevel : difficulty;
     setDifficulty(level);
+    setIsDiagnostic(Boolean(opts?.diagnostic));
+    userCancelledRef.current = false;
+    setProgress(8);
     setStatus("loading");
+
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    progressIntervalRef.current = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 92) {
+          return Math.min(95, prev + 0.1);
+        }
+        if (prev >= 70) {
+          return prev + 0.4;
+        }
+        if (prev >= 30) {
+          return prev + 1.2;
+        }
+        return prev + 2.5;
+      });
+    }, 120);
+
     const controller = new AbortController();
+    abortControllerRef.current = controller;
     // The server generates in small sequential chunks (each under its own LLM
     // timeout), so a large quiz on a slow local model can take a while in total.
     // Give it generous headroom before the client gives up.
@@ -112,6 +165,14 @@ export function QuizSession({
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       const data = (await res.json()) as { questions: Question[]; fallback?: boolean };
       if (!data.questions?.length) throw new Error("No questions returned");
+
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      setProgress(100);
+
+      // Short delay so the user visibly sees the progress bar reach 100%
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      if (!isMountedRef.current || userCancelledRef.current) return;
+
       setFallback(Boolean(data.fallback));
       setQuestions(data.questions);
       setAnswers({});
@@ -120,9 +181,17 @@ export function QuizSession({
       setRemaining(timerEnabled ? timerMinutes * 60 : 0);
       setStatus("active");
     } catch {
-      setStatus("error");
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      if (isMountedRef.current) {
+        if (userCancelledRef.current) {
+          setStatus("setup");
+        } else {
+          setStatus("error");
+        }
+      }
     } finally {
       clearTimeout(timer);
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     }
   }
 
@@ -224,9 +293,70 @@ export function QuizSession({
     setCurrent(0);
     setRemaining(0);
     setFallback(false);
+    setProgress(0);
   }
 
-  if (status === "setup" || status === "loading" || status === "error") {
+  if (status === "loading") {
+    const formatLabels = formats
+      .map((f) => FORMATS.find((fmt) => fmt.value === f)?.label ?? f)
+      .join(", ");
+
+    return (
+      <div className="space-y-6" role="status" aria-live="polite">
+        <div className="bg-card space-y-5 rounded-xl border p-6">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold tracking-tight">
+              {isDiagnostic
+                ? `Preparing diagnostic quiz for ${domainName}`
+                : `Generating quiz for ${scope ? scope.name : domainName}`}
+            </h2>
+            <p className="text-muted-foreground text-xs">
+              {isDiagnostic
+                ? "Calibrating key concepts across the subject"
+                : `Level ${difficulty} · ${count} question${count === 1 ? "" : "s"} · ${formatLabels}`}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-medium">
+              <span className="text-muted-foreground">
+                {progress >= 100
+                  ? "Questions ready! Loading your quiz…"
+                  : progress < 30
+                    ? "Designing questions tailored to your level…"
+                    : progress < 70
+                      ? "Generating questions, options, and explanations…"
+                      : "Finalizing questions and checking coverage…"}
+              </span>
+              <span className="text-foreground font-semibold tabular-nums">
+                {Math.round(progress)}%
+              </span>
+            </div>
+            <Progress value={progress} className="[&_[data-slot=progress-track]]:h-2.5" />
+          </div>
+
+          <p className="text-muted-foreground text-xs">
+            Writing fresh questions with the AI — a few seconds on a hosted model, longer on a local
+            one.
+          </p>
+
+          <div className="pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={cancelQuiz}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "setup" || status === "error") {
     return (
       <div className="space-y-6">
         {suggestDiagnostic && (
@@ -238,16 +368,7 @@ export function QuizSession({
                 Knowra can pitch the right level. You can skip and just start below.
               </p>
             </div>
-            <Button onClick={() => startQuiz({ diagnostic: true })} disabled={status === "loading"}>
-              {status === "loading" ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Starting…
-                </>
-              ) : (
-                "Start diagnostic"
-              )}
-            </Button>
+            <Button onClick={() => startQuiz({ diagnostic: true })}>Start diagnostic</Button>
           </div>
         )}
 
@@ -257,10 +378,9 @@ export function QuizSession({
             <button
               type="button"
               aria-pressed={adaptive}
-              disabled={status === "loading"}
               onClick={() => setAdaptive(true)}
               className={cn(
-                "rounded-lg border p-3 text-left transition-colors disabled:opacity-60",
+                "rounded-lg border p-3 text-left transition-colors",
                 adaptive
                   ? "border-primary bg-accent text-accent-foreground"
                   : "hover:border-primary/40",
@@ -274,10 +394,9 @@ export function QuizSession({
             <button
               type="button"
               aria-pressed={!adaptive}
-              disabled={status === "loading"}
               onClick={() => setAdaptive(false)}
               className={cn(
-                "rounded-lg border p-3 text-left transition-colors disabled:opacity-60",
+                "rounded-lg border p-3 text-left transition-colors",
                 !adaptive
                   ? "border-primary bg-accent text-accent-foreground"
                   : "hover:border-primary/40",
@@ -299,10 +418,9 @@ export function QuizSession({
                   type="button"
                   aria-label={`Difficulty ${value}: ${label}`}
                   aria-pressed={active}
-                  disabled={status === "loading"}
                   onClick={() => setDifficulty(value)}
                   className={cn(
-                    "flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors disabled:opacity-60",
+                    "flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors",
                     active
                       ? "border-primary bg-accent text-accent-foreground"
                       : "hover:border-primary/40",
@@ -329,10 +447,9 @@ export function QuizSession({
                   key={value}
                   type="button"
                   aria-pressed={active}
-                  disabled={status === "loading"}
                   onClick={() => toggleFormat(value)}
                   className={cn(
-                    "flex items-start gap-3 rounded-lg border p-3 text-left transition-colors disabled:opacity-60",
+                    "flex items-start gap-3 rounded-lg border p-3 text-left transition-colors",
                     active
                       ? "border-primary bg-accent text-accent-foreground"
                       : "hover:border-primary/40",
@@ -371,10 +488,9 @@ export function QuizSession({
             max={MAX_QUESTIONS}
             step={1}
             value={count}
-            disabled={status === "loading"}
             onChange={(e) => setCount(Number(e.target.value))}
             aria-label="Number of questions"
-            className="accent-primary w-full cursor-pointer disabled:opacity-60"
+            className="accent-primary w-full cursor-pointer"
           />
           <div className="text-muted-foreground flex justify-between text-[11px]">
             <span>{MIN_QUESTIONS}</span>
@@ -393,10 +509,9 @@ export function QuizSession({
               role="switch"
               aria-checked={timerEnabled}
               aria-label="Enable timer"
-              disabled={status === "loading"}
               onClick={() => setTimerEnabled((v) => !v)}
               className={cn(
-                "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-60",
+                "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
                 timerEnabled ? "bg-primary" : "bg-input",
               )}
             >
@@ -419,7 +534,6 @@ export function QuizSession({
                 min={1}
                 max={120}
                 value={timerMinutes}
-                disabled={status === "loading"}
                 onChange={(e) =>
                   setTimerMinutes(Math.max(1, Math.min(120, Number(e.target.value) || 1)))
                 }
@@ -442,27 +556,9 @@ export function QuizSession({
           </p>
         )}
 
-        <Button
-          size="lg"
-          onClick={() => startQuiz()}
-          disabled={status === "loading" || formats.length === 0}
-        >
-          {status === "loading" ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Generating…
-            </>
-          ) : (
-            "Start quiz"
-          )}
+        <Button size="lg" onClick={() => startQuiz()} disabled={formats.length === 0}>
+          Start quiz
         </Button>
-
-        {status === "loading" && (
-          <p className="text-muted-foreground text-xs">
-            Writing fresh questions with the AI — a few seconds on a hosted model, longer on a local
-            one.
-          </p>
-        )}
       </div>
     );
   }
