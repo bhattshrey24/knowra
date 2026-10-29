@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Home, Layers, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ProfileMenu } from "@/components/profile-menu";
 
 const links = [
   { href: "/home", label: "Home", icon: Home },
@@ -42,6 +43,9 @@ export function AppNav() {
             );
           })}
           <ThemeToggle />
+          <div className="ml-1 border-l pl-1">
+            <ProfileMenu />
+          </div>
         </nav>
       </div>
     </header>

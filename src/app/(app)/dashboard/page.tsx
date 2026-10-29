@@ -15,6 +15,7 @@ import { DifficultyAccuracyChart } from "@/components/difficulty-accuracy-chart"
 import { RetentionPanel } from "@/components/retention-panel";
 import { ActivityHeatmap } from "@/components/activity-heatmap";
 import { KnowledgeRadar } from "@/components/knowledge-radar";
+import { AuthSyncBanner } from "@/components/auth-sync-banner";
 import { predefinedLearnable } from "@/lib/learnable";
 import { createClient } from "@/lib/db/server";
 import { customTitleMap } from "@/lib/db/learnable-server";
@@ -297,6 +298,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <AuthSyncBanner />
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Your knowledge profile</h1>
         <p className="text-muted-foreground mt-1 text-sm">

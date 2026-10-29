@@ -190,7 +190,7 @@ All metric computation lives in the deterministic engine (`src/lib/learning/anal
 > mastery) — a small daily-snapshot table if we want real trend lines; otherwise accuracy-over-time
 > is the proxy. Keep all metric computation in the deterministic engine; charts only render it.
 
-## Phase 8 — Accounts & profiles (durable, cross-device logins) ⬜
+## Phase 8 — Accounts & profiles (durable, cross-device logins) ✅
 
 **The data layer is already multi-user.** Every user table has RLS (`auth.uid() = user_id`), a
 `profiles` table auto-creates on signup via the `handle_new_user` trigger, and `AuthBootstrap`
@@ -201,19 +201,18 @@ anonymous session that's lost on cookie-clear and can't follow the user to anoth
 Goal: real login so each user has a persistent, isolated profile, **without a signup wall** and at
 **$0**. No schema/RLS changes needed for isolation — this is mostly auth config + linking + UI.
 
-- ⬜ **8.1 Enable a free auth method:** Prefer **Google/GitHub OAuth** (one-click, no email
-  delivery, no rate limits, free) — register a free OAuth app, add client id/secret in Supabase.
-  _Alternative:_ email + password with email-confirmation disabled (also $0). Avoid built-in
-  magic-link/OTP at scale (free SMTP is rate-limited); wire Resend/custom SMTP only if we want it.
-- ⬜ **8.2 Anonymous → permanent linking:** Use Supabase `linkIdentity`/`updateUser` so a learner
-  who's been using the app anonymously **keeps their existing data** when they sign in (the anon
-  `user_id` becomes permanent — no row migration). `AuthBootstrap` stays; add an "upgrade this
-  session" step on sign-in.
-- ⬜ **8.3 Auth UI (anonymous-first):** Sign-in page/modal, a profile menu in the top bar
-  (avatar/name/sign-out), and an optional "Sign in to sync across devices" banner. **No login
-  wall** — keep anonymous-first for activation/demos.
-- ⬜ **8.4 Profiles & account hygiene:** Edit `display_name`/`avatar_url` (extend `profiles`);
-  delete-account (cascades via existing `on delete cascade`); basic settings.
+- ✅ **8.1 Enable a free auth method:** OAuth (Google & GitHub) via standard Supabase redirect flow and code exchange route (`/auth/callback`), plus Email/Password signup & signin.
+- ✅ **8.2 Anonymous → permanent linking:** When signing up or linking from an anonymous session, calls Supabase `updateUser({ email, password, data })` / `linkIdentity`, preserving the current user's `id` and keeping all attempts, mastery records, and flashcards intact without manual row migration.
+- ✅ **8.3 Auth UI (anonymous-first):**
+  - Sign-in page (`/login`) with tabbed Email vs OAuth sign-in/up and anonymous account upgrade detection.
+  - Top-bar ProfileMenu in `AppNav` showing user initials/avatar, display name, Guest/Permanent badge, links to `/profile`, and sign-out.
+  - Dismissible `AuthSyncBanner` on `/dashboard` nudging anonymous learners to secure their learning data.
+  - Zero login wall: guest sessions still auto-created via `AuthBootstrap`.
+- ✅ **8.4 Profiles & account hygiene:**
+  - Editable display name with Zod validation via `GET`/`PATCH /api/profile`.
+  - Migration `0010_profile_avatar.sql` adds optional `avatar_url`.
+  - Account deletion (`DELETE /api/profile`) using admin Supabase client cascading through all user attempts, mastery, and flashcards.
+  - Full settings UI on `/profile`.
 
 **Cost = $0:** Supabase Auth is free (≈50k monthly active users), OAuth is free, Vercel Hobby is
 free. No paid service introduced; the anon key stays public-safe, service-role stays server-only.

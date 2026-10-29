@@ -120,4 +120,3 @@ export function KnowledgeRadar({ subjects }: { subjects: RadarSubject[] }) {
     </Card>
   );
 }
-
