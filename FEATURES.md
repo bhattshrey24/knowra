@@ -136,10 +136,14 @@ validates every taxonomy relationship, question structure, answer key, and diffi
   band + recent accuracy with the progressive-load cap; the quiz-start screen defaults to
   **Adaptive** (Knowra picks the level, computed server-side from mastery + recent attempts), with
   a "Choose yourself" 1–5 override. Learning-goals input is future work._
-- ⬜ **6.7 Learner profile:** Continuously update concept-level mastery and weaknesses from quiz
+- 🟨 **6.7 Learner profile:** Continuously update concept-level mastery and weaknesses from quiz
   attempts, accuracy, question difficulty, timestamps, and retention results where available.
   Derive topic-/subject-level insight from concept-level evidence. **Never** mark a concept
-  weak/mastered from a single response.
+  weak/mastered from a single response. _Landed: concept mastery folds in accuracy + question
+  difficulty (`updateMastery`) on every attempt, timestamps drive retention scheduling, and
+  flashcard reviews now feed back as retention outcomes (`retentionOutcome` → `concept_mastery`);
+  topic/subject insight is derived via `aggregateByLevel`; the min-evidence gate means no concept
+  is called weak/mastered from a single response. Live verification needs accumulated history._
 
 - 🟨 **6.x Homepage & catalogue (supports 6.2/6.3):** Redesigned `/home` around the taxonomy — a
   prominent search bar ("Search any subject, topic or concept…") with "Try:" examples and live

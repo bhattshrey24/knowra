@@ -8,7 +8,19 @@
  * in improve.md.
  */
 
+import type { Difficulty } from "@/types/learning";
+
 export type ReviewGrade = "again" | "hard" | "good" | "easy";
+
+/**
+ * Map a flashcard review grade to a mastery outcome, so retention checks feed
+ * the learner profile (Phase 6.7). "Again" is a lapse; hard/good/easy count as
+ * a recall. A retention check is difficulty-neutral, so it folds in at a medium
+ * difficulty.
+ */
+export function retentionOutcome(grade: ReviewGrade): { correct: boolean; difficulty: Difficulty } {
+  return { correct: grade !== "again", difficulty: 3 };
+}
 
 /** Maps the UI's four buttons to SM-2 quality scores (0..5); <3 is a lapse. */
 const QUALITY: Record<ReviewGrade, number> = { again: 2, hard: 3, good: 4, easy: 5 };

@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/db/server";
 import { isSupabaseConfigured } from "@/lib/env";
-import { scheduleNext, type SchedulingState } from "@/lib/learning/sm2";
+import { retentionOutcome, scheduleNext, type SchedulingState } from "@/lib/learning/sm2";
+import { foldConceptMastery } from "@/lib/learning/aggregate";
+import { INITIAL_MASTERY, type MasteryState } from "@/lib/learning/mastery";
 
 export const runtime = "nodejs";
 
@@ -39,7 +41,7 @@ export async function POST(req: Request): Promise<Response> {
     // RLS also enforces ownership; the explicit user_id filter is defence in depth.
     const { data: card } = await supabase
       .from("flashcards")
-      .select("reps,ease,interval_days")
+      .select("reps,ease,interval_days,concept_id")
       .eq("id", cardId)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -64,6 +66,34 @@ export async function POST(req: Request): Promise<Response> {
       })
       .eq("id", cardId)
       .eq("user_id", user.id);
+
+    // Fold the retention result into the concept's mastery (Phase 6.7).
+    const conceptId = card.concept_id as string | null;
+    if (conceptId) {
+      const { data: row } = await supabase
+        .from("concept_mastery")
+        .select("mastery,confidence,attempts,correct")
+        .eq("user_id", user.id)
+        .eq("concept_id", conceptId)
+        .maybeSingle();
+      const prevMastery: MasteryState = (row as MasteryState | null) ?? INITIAL_MASTERY;
+      const nextMastery =
+        foldConceptMastery(new Map([[conceptId, prevMastery]]), [
+          { conceptId, ...retentionOutcome(grade) },
+        ]).get(conceptId) ?? prevMastery;
+      await supabase.from("concept_mastery").upsert(
+        {
+          user_id: user.id,
+          concept_id: conceptId,
+          mastery: nextMastery.mastery,
+          confidence: nextMastery.confidence,
+          attempts: nextMastery.attempts,
+          correct: nextMastery.correct,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,concept_id" },
+      );
+    }
 
     return NextResponse.json({ updated: true, dueAt, intervalDays: next.intervalDays });
   } catch {
