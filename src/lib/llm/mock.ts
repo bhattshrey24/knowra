@@ -22,9 +22,13 @@ export class MockLLMProvider implements LLMProvider {
   async generateQuestions(input: GenerateQuestionsInput): Promise<GeneratedQuestion[]> {
     const count = Math.max(1, Math.min(input.count, 30));
     const format = input.formats[0] ?? "mcq";
+    const concepts = input.concepts ?? [];
     return Array.from({ length: count }, (_, i) => {
       const options = Array.from({ length: 4 }, (_, j) => `${input.conceptName} — choice ${j + 1}`);
       const prompt = `[${input.domainName}] Practice question ${i + 1} on "${input.conceptName}" (level ${input.difficulty}).`;
+      // Mirror a real provider: when scoped to concepts, label each question
+      // (round-robin) so the app's concept tagging has something to resolve.
+      const conceptLabel = concepts.length ? concepts[i % concepts.length].name : undefined;
 
       if (format === "written") {
         return {
@@ -33,6 +37,7 @@ export class MockLLMProvider implements LLMProvider {
           prompt: `Explain in your own words: ${input.conceptName} (question ${i + 1}).`,
           referenceAnswer: `A good answer covers the core idea of "${input.conceptName}".`,
           explanation: `This is mock reference content for "${input.conceptName}".`,
+          conceptLabel,
         };
       }
 
@@ -45,6 +50,7 @@ export class MockLLMProvider implements LLMProvider {
           options,
           correctIndices,
           explanation: `Choices ${correctIndices.map((n) => n + 1).join(" and ")} are correct (mock).`,
+          conceptLabel,
         };
       }
 
@@ -56,6 +62,7 @@ export class MockLLMProvider implements LLMProvider {
         options,
         correctIndices: [correctIndex],
         explanation: `The correct answer is choice ${correctIndex + 1}. This is mock content for "${input.conceptName}".`,
+        conceptLabel,
       };
     });
   }

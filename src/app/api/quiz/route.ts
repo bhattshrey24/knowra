@@ -6,6 +6,9 @@ import type { LLMProvider } from "@/lib/llm/provider";
 import { MockLLMProvider } from "@/lib/llm/mock";
 import { resolveLearnable } from "@/lib/db/learnable-server";
 import { allocateFormatCounts, interleaveByFormat } from "@/lib/learning/quiz-composition";
+import { getTaxonomy } from "@/lib/db/taxonomy-server";
+import { conceptsForScope } from "@/lib/learning/taxonomy";
+import { assignConceptIds, type AllowedConcept } from "@/lib/learning/concept-tagging";
 import { rateLimit } from "@/lib/rate-limit";
 import type { Difficulty, Question, QuestionFormat } from "@/types/learning";
 
@@ -31,7 +34,17 @@ type GenInput = {
   domainName: string;
   difficulty: Difficulty;
   count: number;
+  concepts?: AllowedConcept[];
 };
+
+/** The taxonomy concepts a subject-scoped quiz draws from (empty for custom topics). */
+async function conceptsForSubject(slug: string): Promise<AllowedConcept[]> {
+  const tax = await getTaxonomy();
+  return conceptsForScope(tax, "subject", slug)
+    .map((id) => tax.conceptById.get(id))
+    .filter((c): c is NonNullable<typeof c> => Boolean(c))
+    .map((c) => ({ id: c.id, name: c.name }));
+}
 
 /**
  * Generate a mixed-format quiz: split the count across the selected formats
@@ -90,6 +103,11 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: "Unknown topic" }, { status: 404 });
   }
 
+  // Scope a predefined subject to its taxonomy concepts so every question maps
+  // to one (Phase 6.1). Custom topics aren't in the taxonomy — they keep their
+  // own slug as the concept id.
+  const allowedConcepts = learnable.isCustom ? [] : await conceptsForSubject(learnable.slug);
+
   const provider = getLLMProvider();
   const genInput: GenInput = {
     conceptName: learnable.name,
@@ -97,6 +115,7 @@ export async function POST(req: Request): Promise<Response> {
     domainName: learnable.name,
     difficulty: difficulty as Difficulty,
     count,
+    concepts: allowedConcepts.length > 0 ? allowedConcepts : undefined,
   };
 
   let generated;
@@ -121,11 +140,22 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
-  const questions: Question[] = generated.map((g) => ({
-    ...g,
-    id: randomUUID(),
-    conceptId: learnable.slug,
-  }));
+  // Resolve each question's model-proposed concept label to a validated concept
+  // id; fall back to the learnable's own slug when it isn't in the taxonomy.
+  const conceptIds = assignConceptIds(
+    generated.map((g) => g.conceptLabel),
+    allowedConcepts,
+  );
+  const questions: Question[] = generated.map((g, i) => {
+    // Drop the transient concept label once resolved; it isn't part of Question.
+    const question: Question & { conceptLabel?: string } = {
+      ...g,
+      id: randomUUID(),
+      conceptId: conceptIds ? conceptIds[i] : learnable.slug,
+    };
+    delete question.conceptLabel;
+    return question;
+  });
 
   return NextResponse.json({
     domain: learnable.slug,

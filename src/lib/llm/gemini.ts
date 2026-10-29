@@ -24,6 +24,7 @@ import {
   toGeneratedQuestion,
   toGeneratedWrittenQuestion,
 } from "@/lib/validation/question";
+import { conceptClause } from "@/lib/llm/concept-prompt";
 
 type FetchFn = typeof fetch;
 
@@ -36,6 +37,7 @@ const MCQ_RESPONSE_SCHEMA = {
       options: { type: "ARRAY", items: { type: "STRING" } },
       correctIndex: { type: "INTEGER" },
       explanation: { type: "STRING" },
+      concept: { type: "STRING" },
     },
     required: ["prompt", "options", "correctIndex", "explanation"],
   },
@@ -50,6 +52,7 @@ const MULTI_RESPONSE_SCHEMA = {
       options: { type: "ARRAY", items: { type: "STRING" } },
       correctIndices: { type: "ARRAY", items: { type: "INTEGER" } },
       explanation: { type: "STRING" },
+      concept: { type: "STRING" },
     },
     required: ["prompt", "options", "correctIndices", "explanation"],
   },
@@ -63,6 +66,7 @@ const WRITTEN_RESPONSE_SCHEMA = {
       prompt: { type: "STRING" },
       referenceAnswer: { type: "STRING" },
       explanation: { type: "STRING" },
+      concept: { type: "STRING" },
     },
     required: ["prompt", "referenceAnswer", "explanation"],
   },
@@ -86,7 +90,7 @@ export class GeminiProvider implements LLMProvider {
       : "";
 
     if (format === "multi") {
-      const prompt = `Generate ${input.count} multiple-select questions on ${context}. Each has 4 options and one OR MORE correct answers (correctIndices).${avoid}`;
+      const prompt = `Generate ${input.count} multiple-select questions on ${context}. Each has 4 options and one OR MORE correct answers (correctIndices).${conceptClause(input)}${avoid}`;
       const raw = await this.generateJson(prompt, MULTI_RESPONSE_SCHEMA);
       const parsed = parseLlmMulti(raw);
       if (!parsed.success) throw new Error(`Gemini returned invalid multi output: ${parsed.error}`);
@@ -94,7 +98,7 @@ export class GeminiProvider implements LLMProvider {
     }
 
     if (format === "written") {
-      const prompt = `Generate ${input.count} short open-ended questions on ${context}. For each, give a concise referenceAnswer (1-3 sentences) a grader can match against.${avoid}`;
+      const prompt = `Generate ${input.count} short open-ended questions on ${context}. For each, give a concise referenceAnswer (1-3 sentences) a grader can match against.${conceptClause(input)}${avoid}`;
       const raw = await this.generateJson(prompt, WRITTEN_RESPONSE_SCHEMA);
       const parsed = parseLlmWritten(raw);
       if (!parsed.success)
@@ -102,7 +106,7 @@ export class GeminiProvider implements LLMProvider {
       return parsed.data.map((w) => toGeneratedWrittenQuestion(w, input.difficulty));
     }
 
-    const prompt = `Generate ${input.count} multiple-choice questions on ${context}. Each has exactly 4 options and one correct answer.${avoid}`;
+    const prompt = `Generate ${input.count} multiple-choice questions on ${context}. Each has exactly 4 options and one correct answer.${conceptClause(input)}${avoid}`;
     const raw = await this.generateJson(prompt, MCQ_RESPONSE_SCHEMA);
     const parsed = parseLlmMcqs(raw);
     if (!parsed.success) throw new Error(`Gemini returned invalid MCQ output: ${parsed.error}`);

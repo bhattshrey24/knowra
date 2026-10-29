@@ -15,6 +15,8 @@ export const llmMcqSchema = z
     options: z.array(z.string().min(1).max(500)).min(2).max(6),
     correctIndex: z.number().int().nonnegative(),
     explanation: z.string().min(1).max(2000),
+    /** Optional concept label the model assigns (Phase 6.1); app-validated. */
+    concept: z.string().min(1).max(200).optional(),
   })
   .refine((q) => q.correctIndex < q.options.length, {
     message: "correctIndex is outside the options range",
@@ -48,6 +50,7 @@ export function toGeneratedQuestion(mcq: LlmMcq, difficulty: Difficulty): Genera
     options: mcq.options,
     correctIndices: [mcq.correctIndex],
     explanation: mcq.explanation,
+    conceptLabel: mcq.concept,
   };
 }
 
@@ -58,6 +61,7 @@ export const llmMultiSchema = z
     options: z.array(z.string().min(1).max(500)).min(2).max(6),
     correctIndices: z.array(z.number().int().nonnegative()).min(1).max(6),
     explanation: z.string().min(1).max(2000),
+    concept: z.string().min(1).max(200).optional(),
   })
   .refine((q) => q.correctIndices.every((i) => i < q.options.length), {
     message: "a correctIndex is outside the options range",
@@ -94,6 +98,7 @@ export function toGeneratedMultiQuestion(
     options: multi.options,
     correctIndices: [...multi.correctIndices].sort((a, b) => a - b),
     explanation: multi.explanation,
+    conceptLabel: multi.concept,
   };
 }
 
@@ -102,6 +107,7 @@ export const llmWrittenSchema = z.object({
   prompt: z.string().min(1).max(1000),
   referenceAnswer: z.string().min(1).max(2000),
   explanation: z.string().min(1).max(2000),
+  concept: z.string().min(1).max(200).optional(),
 });
 
 export type LlmWritten = z.infer<typeof llmWrittenSchema>;
@@ -129,5 +135,6 @@ export function toGeneratedWrittenQuestion(
     prompt: written.prompt,
     referenceAnswer: written.referenceAnswer,
     explanation: written.explanation,
+    conceptLabel: written.concept,
   };
 }

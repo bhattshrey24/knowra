@@ -72,16 +72,19 @@ quizzing, and revision operate at the concept level. Extends the concept-level "
 #2, #3, #7, #8, #12, #13, #14 — the LLM proposes classifications and questions; application logic
 validates every taxonomy relationship, question structure, answer key, and difficulty tag.
 
-- 🟨 **6.1 Hierarchy:** Model `Subject → Topic → Concept`. Every generated question is mapped to its
-  underlying concept, regardless of whether the user takes a subject-, topic-, or concept-level
-  quiz. Concepts may relate to multiple topics/subjects **without duplication** (shared concept,
-  many links). _Landed: deterministic taxonomy engine (`src/lib/learning/taxonomy.ts`, unit-tested
-  — validation + scope→concepts resolution), seed catalog (`src/lib/taxonomy/seed.ts`), shared-
-  taxonomy schema (migration `0007`, service-role writes / authenticated read), and the DB
-  access + idempotent seed loader (`db/taxonomy-server.ts` with pure round-trip-tested row mapping;
-  `getTaxonomy()` reads the DB catalog, falling back to the seed). Load it via
-  `POST /api/admin/seed-taxonomy` (guarded by `SEED_TOKEN`). Next: tag generated questions with
-  their concept and quiz at topic/concept level (6.2)._
+- ✅ **6.1 Hierarchy:** Model `Subject → Topic → Concept`. Every generated question is mapped to its
+  underlying concept. Concepts may relate to multiple topics/subjects **without duplication**
+  (shared concept, many links). _Landed: deterministic taxonomy engine (`learning/taxonomy.ts`,
+  unit-tested — validation + scope→concepts resolution), seed catalog (`taxonomy/seed.ts`),
+  shared-taxonomy schema (migration `0007`, service-role writes / authenticated read), DB access +
+  idempotent seed loader (`db/taxonomy-server.ts`, round-trip-tested row mapping; `getTaxonomy()`
+  reads the DB catalog, falling back to the seed; load via `POST /api/admin/seed-taxonomy` guarded
+  by `SEED_TOKEN`), and concept tagging of generated questions — the LLM proposes a per-question
+  concept label, the app validates it against the scope's concepts with a deterministic round-robin
+  fallback (`learning/concept-tagging.ts`). Subject quizzes now spread across their concepts; every
+  question carries a real `conceptId`. Custom topics keep their own slug until 6.3 classifies them.
+  Verified: 124 unit/integration tests + build. (Quizzing *at* topic/concept level and concept-level
+  mastery tracking are 6.2.)_
 - ⬜ **6.2 Quizzing & revision at all three levels:** Let users quiz at subject, topic, or concept
   level. Track results at the concept level and aggregate up into topic- and subject-level stats
   for dashboards, flashcards, and revision. Subject-level quizzes **balance** weak concepts,
