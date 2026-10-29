@@ -10,8 +10,12 @@ import { predefinedLearnable } from "@/lib/learnable";
 import { createClient } from "@/lib/db/server";
 import { customTitleMap } from "@/lib/db/learnable-server";
 import { isSupabaseConfigured } from "@/lib/env";
-import { masteryOutOfTen, type MasteryState } from "@/lib/learning/mastery";
+import { INITIAL_MASTERY, masteryOutOfTen, type MasteryState } from "@/lib/learning/mastery";
 import { focusAreas, needsFoundationalWork, type FocusReason } from "@/lib/learning/focus";
+import { aggregateByLevel, weakestConcepts } from "@/lib/learning/aggregate";
+import { subjectsOfConcept } from "@/lib/learning/taxonomy";
+import { getTaxonomy } from "@/lib/db/taxonomy-server";
+import { quizHref } from "@/lib/taxonomy/catalogue";
 import {
   accuracyTimeline,
   domainGains,
@@ -32,19 +36,25 @@ interface MasteryRow extends MasteryState {
   domain_slug: string;
 }
 
+interface ConceptMasteryRow extends MasteryState {
+  concept_id: string;
+}
+
 async function loadData(): Promise<{
   mastery: MasteryRow[];
   attempts: AttemptLike[];
+  conceptMastery: ConceptMasteryRow[];
   titles: Map<string, string>;
 }> {
-  if (!isSupabaseConfigured()) return { mastery: [], attempts: [], titles: new Map() };
+  const empty = { mastery: [], attempts: [], conceptMastery: [], titles: new Map() };
+  if (!isSupabaseConfigured()) return empty;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { mastery: [], attempts: [], titles: new Map() };
+  if (!user) return empty;
 
-  const [masteryRes, attemptsRes, titles] = await Promise.all([
+  const [masteryRes, attemptsRes, conceptRes, titles] = await Promise.all([
     supabase
       .from("domain_mastery")
       .select("domain_slug,mastery,confidence,attempts,correct")
@@ -55,6 +65,10 @@ async function loadData(): Promise<{
       .select("domain_slug,total,correct,created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("concept_mastery")
+      .select("concept_id,mastery,confidence,attempts,correct")
+      .eq("user_id", user.id),
     customTitleMap(),
   ]);
 
@@ -65,7 +79,12 @@ async function loadData(): Promise<{
     createdAt: a.created_at as string,
   }));
 
-  return { mastery: (masteryRes.data as MasteryRow[] | null) ?? [], attempts, titles };
+  return {
+    mastery: (masteryRes.data as MasteryRow[] | null) ?? [],
+    attempts,
+    conceptMastery: (conceptRes.data as ConceptMasteryRow[] | null) ?? [],
+    titles,
+  };
 }
 
 function displayName(slug: string, titles: Map<string, string>): string {
@@ -84,7 +103,7 @@ function StatTile({ label, value }: { label: string; value: string }) {
 }
 
 export default async function DashboardPage() {
-  const { mastery, attempts, titles } = await loadData();
+  const { mastery, attempts, conceptMastery, titles } = await loadData();
 
   if (mastery.length === 0 && attempts.length === 0) {
     return (
@@ -117,6 +136,21 @@ export default async function DashboardPage() {
       attempts: r.attempts,
     })),
   );
+
+  // Concept-level knowledge profile (Phase 6.2): aggregate concept evidence up
+  // to topics, and surface the weakest concepts to revise.
+  const byConcept = new Map<string, MasteryState>(
+    conceptMastery.map((c) => [
+      c.concept_id,
+      { mastery: c.mastery, confidence: c.confidence, attempts: c.attempts, correct: c.correct },
+    ]),
+  );
+  const tax = await getTaxonomy();
+  const topicRollups = [...aggregateByLevel(byConcept, tax, "topic").entries()]
+    .filter(([, s]) => s.conceptsAssessed > 0)
+    .sort((a, b) => a[1].mastery - b[1].mastery)
+    .slice(0, 6);
+  const weakConceptIds = weakestConcepts(byConcept, 6);
 
   return (
     <div className="space-y-8">
@@ -235,6 +269,81 @@ export default async function DashboardPage() {
           })}
         </div>
       </section>
+
+      {weakConceptIds.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-medium">Weakest concepts</h2>
+          <p className="text-muted-foreground text-sm">
+            The specific ideas to shore up next — practise any one directly.
+          </p>
+          <div className="divide-y overflow-hidden rounded-xl border">
+            {weakConceptIds.map((id) => {
+              const concept = tax.conceptById.get(id);
+              if (!concept) return null;
+              const subjectId = subjectsOfConcept(tax, id)[0] ?? "";
+              const topicName = tax.topicById.get(concept.topicIds[0])?.name;
+              const subjectName = tax.subjectById.get(subjectId)?.name;
+              const outOfTen = masteryOutOfTen(byConcept.get(id) ?? INITIAL_MASTERY);
+              return (
+                <Link
+                  key={id}
+                  href={quizHref({ level: "concept", id, subjectId })}
+                  className="hover:bg-muted flex items-center justify-between gap-3 px-4 py-3 transition-colors"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">{concept.name}</span>
+                    <span className="text-muted-foreground block truncate text-xs">
+                      {[subjectName, topicName].filter(Boolean).join(" · ")}
+                    </span>
+                  </span>
+                  <span className="text-sm font-semibold">
+                    {outOfTen}
+                    <span className="text-muted-foreground">/10</span>
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {topicRollups.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-medium">By topic</h2>
+          <p className="text-muted-foreground text-sm">
+            Mastery rolled up from the concepts you&apos;ve been quizzed on.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {topicRollups.map(([topicId, s]) => {
+              const topic = tax.topicById.get(topicId);
+              if (!topic) return null;
+              const subjectName = tax.subjectById.get(topic.subjectId)?.name;
+              return (
+                <Card key={topicId}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <div className="min-w-0">
+                        <CardTitle className="truncate text-base">{topic.name}</CardTitle>
+                        <span className="text-muted-foreground text-xs">{subjectName}</span>
+                      </div>
+                      <span className="text-sm font-semibold">
+                        {Math.round(s.mastery * 10)}
+                        <span className="text-muted-foreground">/10</span>
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <Progress value={s.mastery * 100} aria-label={`${topic.name} mastery`} />
+                    <div className="text-muted-foreground text-xs">
+                      {s.conceptsAssessed} of {s.conceptsTotal} concepts assessed
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

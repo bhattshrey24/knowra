@@ -65,6 +65,81 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 - ⏸️ 5B: RAG / pgvector semantic retrieval — **deliberately deferred** (small corpus, embeddings
   cost); #10 is delivered via 5A. Design documented in `improve.md`.
 
+## Phase 6 — Concept-level taxonomy & adaptive mastery ⬜ (next — build step by step)
+
+Deepens the model from flat subjects to a `Subject → Topic → Concept` taxonomy so mastery,
+quizzing, and revision operate at the concept level. Extends the concept-level "later" notes on
+#2, #3, #7, #8, #12, #13, #14 — the LLM proposes classifications and questions; application logic
+validates every taxonomy relationship, question structure, answer key, and difficulty tag.
+
+- ✅ **6.1 Hierarchy:** Model `Subject → Topic → Concept`. Every generated question is mapped to its
+  underlying concept. Concepts may relate to multiple topics/subjects **without duplication**
+  (shared concept, many links). _Landed: deterministic taxonomy engine (`learning/taxonomy.ts`,
+  unit-tested — validation + scope→concepts resolution), seed catalog (`taxonomy/seed.ts`),
+  shared-taxonomy schema (migration `0007`, service-role writes / authenticated read), DB access +
+  idempotent seed loader (`db/taxonomy-server.ts`, round-trip-tested row mapping; `getTaxonomy()`
+  reads the DB catalog, falling back to the seed; load via `POST /api/admin/seed-taxonomy` guarded
+  by `SEED_TOKEN`), and concept tagging of generated questions — the LLM proposes a per-question
+  concept label, the app validates it against the scope's concepts with a deterministic round-robin
+  fallback (`learning/concept-tagging.ts`). Subject quizzes now spread across their concepts; every
+  question carries a real `conceptId`. Custom topics keep their own slug until 6.3 classifies them.
+  Verified: 124 unit/integration tests + build. (Quizzing *at* topic/concept level and concept-level
+  mastery tracking are 6.2.)_
+- 🟨 **6.2 Quizzing & revision at all three levels:** Let users quiz at subject, topic, or concept
+  level. Track results at the concept level and aggregate up into topic- and subject-level stats
+  for dashboards, flashcards, and revision. Subject-level quizzes **balance** weak concepts,
+  unassessed concepts, and previously mastered concepts due for a retention check. _Landed:
+  quizzing at any level (scope-aware generation, from the homepage step); concept-level mastery
+  tracking — deterministic `foldConceptMastery` + `aggregateByLevel` (concept→topic→subject),
+  unit-tested; migration `0008` (`concept_mastery` + `attempt_answers.concept_id`); `/api/attempts`
+  records each tagged answer's outcome and updates concept mastery. Balanced subject/topic-quiz
+  selection — `selectConceptsForQuiz` (unit-tested) picks a weak / unassessed / retention-due mix
+  with a min-evidence gate (never weak/mastered from a single response); `/api/quiz` uses it with
+  the learner's `concept_mastery` (degrades to a clean spread without data). Dashboard surfaces the
+  concept→topic rollups (`aggregateByLevel`) as a "By topic" breakdown plus a "Weakest concepts"
+  list that deep-links to concept quizzes (`weakestConcepts`, min-evidence gated). Flashcards are
+  concept-aware: cards carry `concept_id` (migration `0009`), the study view shows the concept, and
+  the Due-for-review queue is ordered weakest-concept-first (`orderByConceptWeakness`). **All of
+  6.2's code is in; live verification needs migrations `0007`–`0009` applied + anon auth.**_
+- ⬜ **6.3 Search & create:** Homepage search bar over existing subjects/topics/concepts. If no
+  match, the user describes what they want to learn; the LLM proposes a classification, checks for
+  duplicates and valid relationships, and the user can correct it before saving.
+- 🟨 **6.4 Initial taxonomy seed:** Seed the DB with a diverse, reasonably comprehensive set of
+  subjects, topics, and concepts. The taxonomy expands as users explore new areas, **without
+  creating duplicate entries**. _Landed: a 24-subject catalogue (~75 topics, ~215 concepts) across
+  STEM, humanities, arts, social science, business and more (`taxonomy/seed.ts`, derived from
+  `DOMAINS` so every subject is quizzable). Loading into the DB still needs migration `0007`
+  applied + `POST /api/admin/seed-taxonomy`; until then `getTaxonomy()` serves this seed._
+- ⬜ **6.5 Adaptive diagnostics:** When a user picks an area with insufficient history, offer a
+  short adaptive diagnostic to estimate concept-level mastery. Users may skip and start learning;
+  mastery stays **uncertain** until there's enough evidence. Reuse reliable existing performance
+  data rather than re-assessing.
+- ⬜ **6.6 Difficulty calibration:** Separate **question difficulty** from **user mastery**.
+  Difficulty 1–5 with consistent, concept-calibrated guidelines (concept + reasoning required).
+  Recommend difficulty from diagnostics, mastery estimates, recent performance, and learning
+  goals; adaptive difficulty is the **default**, user can still choose their own.
+- ⬜ **6.7 Learner profile:** Continuously update concept-level mastery and weaknesses from quiz
+  attempts, accuracy, question difficulty, timestamps, and retention results where available.
+  Derive topic-/subject-level insight from concept-level evidence. **Never** mark a concept
+  weak/mastered from a single response.
+
+- 🟨 **6.x Homepage & catalogue (supports 6.2/6.3):** Redesigned `/home` around the taxonomy — a
+  prominent search bar ("Search any subject, topic or concept…") with "Try:" examples and live
+  closest-match suggestions (`taxonomy/catalogue.ts`, unit-tested ranking); an Explore-the-catalogue
+  Subjects/Topics/Concepts tab view where topic cards show their subject and concept cards show
+  their topic + subject; and a Continue-learning section (recent subjects with progress + cards due
+  for revision from real data, with an empty state for new users). Clicking a topic/concept routes
+  to a scope-aware quiz (`?topic=`/`?concept=`) — `/api/quiz` accepts an in-subject scope and tags
+  every question accordingly, reusing 6.1's concept resolution. _Still 6.2/6.3: concept-level
+  mastery tracking + aggregation + subject-quiz balancing, and LLM-classified create-on-no-match._
+
+> **Important:** Consistent taxonomy and concept tagging are essential across quizzes, flashcards,
+> revision, learner profiles, and dashboards. Support concepts related to multiple topics/subjects
+> without duplication. The LLM proposes classifications and generates questions; **application
+> logic validates** taxonomy relationships, question structure, answer keys, and difficulty
+> metadata. Keep all of this in the deterministic engine per the golden rules — the LLM never owns
+> taxonomy or scoring.
+
 ## MVP features (sequenced across phases; none removed)
 
 | #   | Feature                               | Phase | Status | Notes                                                                                         |

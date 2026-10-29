@@ -16,7 +16,14 @@ import type { Concept, Difficulty, Flashcard, Question, QuestionFormat } from "@
  * Content a provider returns, before the system assigns identifiers. `id` and
  * `conceptId` are owned by our database layer, not the model.
  */
-export type GeneratedQuestion = Omit<Question, "id" | "conceptId">;
+export type GeneratedQuestion = Omit<Question, "id" | "conceptId"> & {
+  /**
+   * The concept name the model says this question tests (Phase 6.1). Untrusted
+   * and transient: the app resolves it to a validated taxonomy concept id and
+   * drops it before storing. Present only when `concepts` was supplied.
+   */
+  conceptLabel?: string;
+};
 export type GeneratedFlashcard = Omit<Flashcard, "id" | "conceptId">;
 
 export interface GenerateQuestionsInput {
@@ -26,6 +33,12 @@ export interface GenerateQuestionsInput {
   difficulty: Difficulty;
   formats: QuestionFormat[];
   count: number;
+  /**
+   * The taxonomy concepts this quiz is scoped to (Phase 6.1). When provided,
+   * the model spreads questions across them and labels each with the concept
+   * it tests; the app validates the label against this set.
+   */
+  concepts?: { id: string; name: string }[];
   /** Concepts the user already knows, for cross-domain analogies (#10). */
   knownConcepts?: string[];
   /** Avoid regenerating near-duplicates of these prompts. */

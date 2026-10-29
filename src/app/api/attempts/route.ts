@@ -8,6 +8,7 @@ import { predefinedLearnable } from "@/lib/learnable";
 import { isAnswerCorrect } from "@/lib/learning/scoring";
 import { gradeWritten, isWrittenCorrect } from "@/lib/learning/grade-written";
 import { INITIAL_MASTERY, applyOutcomes, type MasteryState } from "@/lib/learning/mastery";
+import { foldConceptMastery, type ConceptOutcome } from "@/lib/learning/aggregate";
 import { buildFlashcardsFromQuiz } from "@/lib/learning/flashcards";
 import { pickAnalogyAnchor } from "@/lib/learning/connections";
 import type { Difficulty } from "@/types/learning";
@@ -21,6 +22,7 @@ const bodySchema = z.object({
     .array(
       z.object({
         prompt: z.string().min(1).max(1000),
+        conceptId: z.string().min(1).max(100).optional(),
         format: z.enum(["mcq", "multi", "written"]).default("mcq"),
         options: z.array(z.string().min(1).max(500)).max(6).optional(),
         selected: z.array(z.number().int().nonnegative()).max(6).optional(),
@@ -93,6 +95,7 @@ export async function POST(req: Request): Promise<Response> {
         attempt_id: attempt.id,
         user_id: user.id,
         prompt: a.prompt,
+        concept_id: a.conceptId ?? null,
         selected_indices: a.selected ?? [],
         correct_indices: a.correctIndices ?? [],
         is_correct: outcomes[i].correct,
@@ -124,6 +127,56 @@ export async function POST(req: Request): Promise<Response> {
       { onConflict: "user_id,domain_slug" },
     );
 
+    // Concept-level mastery (Phase 6.2): fold each tagged answer's outcome into
+    // its concept, so topic/subject stats can be aggregated from real evidence.
+    const conceptOutcomes: ConceptOutcome[] = answers.flatMap((a, i) =>
+      a.conceptId
+        ? [
+            {
+              conceptId: a.conceptId,
+              correct: outcomes[i].correct,
+              difficulty: difficulty as Difficulty,
+            },
+          ]
+        : [],
+    );
+    if (conceptOutcomes.length > 0) {
+      const ids = [...new Set(conceptOutcomes.map((o) => o.conceptId))];
+      const { data: rows } = await supabase
+        .from("concept_mastery")
+        .select("concept_id,mastery,confidence,attempts,correct")
+        .eq("user_id", user.id)
+        .in("concept_id", ids);
+      const prevByConcept = new Map<string, MasteryState>(
+        (rows ?? []).map((r) => [
+          r.concept_id as string,
+          {
+            mastery: r.mastery as number,
+            confidence: r.confidence as number,
+            attempts: r.attempts as number,
+            correct: r.correct as number,
+          },
+        ]),
+      );
+      const nextByConcept = foldConceptMastery(prevByConcept, conceptOutcomes);
+      const now = new Date().toISOString();
+      await supabase.from("concept_mastery").upsert(
+        ids.map((id) => {
+          const s = nextByConcept.get(id) ?? INITIAL_MASTERY;
+          return {
+            user_id: user.id,
+            concept_id: id,
+            mastery: s.mastery,
+            confidence: s.confidence,
+            attempts: s.attempts,
+            correct: s.correct,
+            updated_at: now,
+          };
+        }),
+        { onConflict: "user_id,concept_id" },
+      );
+    }
+
     // Generate revision flashcards (weakness + foundational), de-duplicated
     // against cards the user already has for this domain.
     const built = buildFlashcardsFromQuiz(answers);
@@ -143,6 +196,7 @@ export async function POST(req: Request): Promise<Response> {
         .map((card) => ({
           user_id: user.id,
           domain_slug: domain,
+          concept_id: card.conceptId ?? null,
           type: card.type,
           front: card.front,
           back: card.back,

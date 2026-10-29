@@ -1,7 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/sw-register";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
+
+// Runs before first paint to apply the stored (or system) theme and avoid a
+// flash of the wrong theme. Must match THEME_STORAGE_KEY in theme-provider.tsx.
+const themeInitScript = `(function(){try{var t=localStorage.getItem('knowra-theme')||'system';var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
 
 const geistSans = Geist({
   variable: "--font-sans",
@@ -42,9 +47,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {children}
-        <ServiceWorkerRegister />
+        <ThemeProvider>
+          {children}
+          <ServiceWorkerRegister />
+        </ThemeProvider>
       </body>
     </html>
   );

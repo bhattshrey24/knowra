@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
-import { Flashcard } from "@/components/flashcard";
+import { DeckBrowser } from "@/components/deck-browser";
 import { ReviewSession, type DueCard } from "@/components/review-session";
 import { predefinedLearnable } from "@/lib/learnable";
 import { createClient } from "@/lib/db/server";
 import { customTitleMap } from "@/lib/db/learnable-server";
 import { isSupabaseConfigured } from "@/lib/env";
+import { groupIntoDecks } from "@/lib/flashcards/decks";
+import { orderByConceptWeakness } from "@/lib/learning/flashcards";
+import { getTaxonomy } from "@/lib/db/taxonomy-server";
 import type { FlashcardType } from "@/types/learning";
 
 export const metadata = { title: "Flashcards" };
@@ -17,71 +19,46 @@ export const dynamic = "force-dynamic";
 interface CardRow {
   id: string;
   domain_slug: string;
+  concept_id: string | null;
   type: FlashcardType;
   front: string;
   back: string;
   due_at: string;
 }
 
-async function loadCards(): Promise<{ cards: CardRow[]; titles: Map<string, string> }> {
-  if (!isSupabaseConfigured()) return { cards: [], titles: new Map() };
+async function loadCards(): Promise<{
+  cards: CardRow[];
+  titles: Map<string, string>;
+  masteryByConcept: Map<string, number>;
+}> {
+  const empty = { cards: [], titles: new Map(), masteryByConcept: new Map() };
+  if (!isSupabaseConfigured()) return empty;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { cards: [], titles: new Map() };
-  const [cardsRes, titles] = await Promise.all([
+  if (!user) return empty;
+  const [cardsRes, masteryRes, titles] = await Promise.all([
     supabase
       .from("flashcards")
-      .select("id,domain_slug,type,front,back,due_at")
+      .select("id,domain_slug,concept_id,type,front,back,due_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
+    supabase.from("concept_mastery").select("concept_id,mastery").eq("user_id", user.id),
     customTitleMap(),
   ]);
-  return { cards: (cardsRes.data as CardRow[] | null) ?? [], titles };
+  const masteryByConcept = new Map<string, number>(
+    (masteryRes.data ?? []).map((m) => [m.concept_id as string, m.mastery as number]),
+  );
+  return { cards: (cardsRes.data as CardRow[] | null) ?? [], titles, masteryByConcept };
 }
 
 function displayName(slug: string, titles: Map<string, string>): string {
   return predefinedLearnable(slug)?.name ?? titles.get(slug) ?? slug;
 }
 
-function Section({
-  title,
-  description,
-  badge,
-  cards,
-  titles,
-}: {
-  title: string;
-  description: string;
-  badge: React.ReactNode;
-  cards: CardRow[];
-  titles: Map<string, string>;
-}) {
-  return (
-    <section className="space-y-3">
-      <div className="flex items-center gap-2">
-        <h2 className="text-lg font-medium">{title}</h2>
-        {badge}
-        <span className="text-muted-foreground text-sm">· {cards.length}</span>
-      </div>
-      <p className="text-muted-foreground text-sm">{description}</p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {cards.map((c) => (
-          <Flashcard
-            key={c.id}
-            front={c.front}
-            back={c.back}
-            hint={displayName(c.domain_slug, titles)}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
 export default async function FlashcardsPage() {
-  const { cards, titles } = await loadCards();
+  const { cards, titles, masteryByConcept } = await loadCards();
 
   if (cards.length === 0) {
     return (
@@ -104,27 +81,42 @@ export default async function FlashcardsPage() {
     );
   }
 
-  const weakness = cards.filter((c) => c.type === "weakness");
-  const foundational = cards.filter((c) => c.type === "foundational");
-  const connections = cards.filter((c) => c.type === "connection");
-
   const now = Date.now();
-  const dueCards: DueCard[] = cards
-    .filter((c) => new Date(c.due_at).getTime() <= now)
-    .map((c) => ({
+  const isDue = (c: CardRow) => new Date(c.due_at).getTime() <= now;
+  const tax = await getTaxonomy();
+  const conceptName = (id: string | null) => (id && tax.conceptById.get(id)?.name) || undefined;
+
+  // Revise the weakest concepts first (Phase 6.2).
+  const dueOrdered = orderByConceptWeakness(
+    cards.filter(isDue).map((c) => ({ ...c, conceptId: c.concept_id ?? undefined })),
+    masteryByConcept,
+  );
+  const dueCards: DueCard[] = dueOrdered.map((c) => ({
+    id: c.id,
+    front: c.front,
+    back: c.back,
+    hint: conceptName(c.concept_id) ?? displayName(c.domain_slug, titles),
+  }));
+
+  const decks = groupIntoDecks(
+    cards.map((c) => ({
       id: c.id,
+      slug: c.domain_slug,
+      name: displayName(c.domain_slug, titles),
+      type: c.type,
       front: c.front,
       back: c.back,
-      hint: displayName(c.domain_slug, titles),
-    }));
+      conceptName: conceptName(c.concept_id),
+      due: isDue(c),
+    })),
+  );
 
   return (
     <div className="space-y-10">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Flashcards</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Tap a card to reveal the answer. Weakness cards target what you got wrong; foundational
-          cards reinforce the essentials.
+          Each subject is a deck. Open one to study its cards — tap to flip, swipe to move on.
         </p>
       </div>
 
@@ -141,35 +133,16 @@ export default async function FlashcardsPage() {
         </section>
       )}
 
-      {weakness.length > 0 && (
-        <Section
-          title="Weakness"
-          description="Concepts you missed — the highest-value things to review."
-          badge={<Badge variant="destructive">Review</Badge>}
-          cards={weakness}
-          titles={titles}
-        />
-      )}
-
-      {foundational.length > 0 && (
-        <Section
-          title="Foundational"
-          description="Core concepts worth keeping sharp, including ones you already know."
-          badge={<Badge variant="secondary">Foundational</Badge>}
-          cards={foundational}
-          titles={titles}
-        />
-      )}
-
-      {connections.length > 0 && (
-        <Section
-          title="Connections"
-          description="Analogies linking a tricky concept to a subject you already know well."
-          badge={<Badge>Cross-domain</Badge>}
-          cards={connections}
-          titles={titles}
-        />
-      )}
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">
+          Your decks <span className="text-muted-foreground">· {decks.length}</span>
+        </h2>
+        <p className="text-muted-foreground text-sm">
+          Weakness cards target what you got wrong, foundational cards reinforce the essentials, and
+          connections link ideas to subjects you already know.
+        </p>
+        <DeckBrowser decks={decks} />
+      </section>
     </div>
   );
 }

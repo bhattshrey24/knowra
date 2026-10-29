@@ -26,6 +26,7 @@ import {
   toGeneratedQuestion,
   toGeneratedWrittenQuestion,
 } from "@/lib/validation/question";
+import { conceptClause } from "@/lib/llm/concept-prompt";
 
 type FetchFn = typeof fetch;
 
@@ -40,6 +41,7 @@ const MCQ_SCHEMA = {
       options: { type: "array", items: STRING },
       correctIndex: { type: "integer" },
       explanation: STRING,
+      concept: STRING,
     },
     required: ["prompt", "options", "correctIndex", "explanation"],
   },
@@ -53,6 +55,7 @@ const MULTI_SCHEMA = {
       options: { type: "array", items: STRING },
       correctIndices: { type: "array", items: { type: "integer" } },
       explanation: STRING,
+      concept: STRING,
     },
     required: ["prompt", "options", "correctIndices", "explanation"],
   },
@@ -61,7 +64,7 @@ const WRITTEN_SCHEMA = {
   type: "array",
   items: {
     type: "object",
-    properties: { prompt: STRING, referenceAnswer: STRING, explanation: STRING },
+    properties: { prompt: STRING, referenceAnswer: STRING, explanation: STRING, concept: STRING },
     required: ["prompt", "referenceAnswer", "explanation"],
   },
 } as const;
@@ -87,7 +90,7 @@ export class OllamaProvider implements LLMProvider {
 
     if (format === "written") {
       const raw = await this.chatJson(
-        `Generate ${input.count} short open-ended questions on ${context}. Give each a concise referenceAnswer (1-3 sentences). Respond as a JSON array.`,
+        `Generate ${input.count} short open-ended questions on ${context}. Give each a concise referenceAnswer (1-3 sentences).${conceptClause(input)} Respond as a JSON array.`,
         WRITTEN_SCHEMA,
       );
       const parsed = parseLlmWritten(raw);
@@ -97,7 +100,7 @@ export class OllamaProvider implements LLMProvider {
 
     if (format === "multi") {
       const raw = await this.chatJson(
-        `Generate ${input.count} multiple-select questions on ${context}. Each has 4 options and one OR MORE correct answers (correctIndices). Respond as a JSON array.`,
+        `Generate ${input.count} multiple-select questions on ${context}. Each has 4 options and one OR MORE correct answers (correctIndices).${conceptClause(input)} Respond as a JSON array.`,
         MULTI_SCHEMA,
       );
       const parsed = parseLlmMulti(raw);
@@ -106,7 +109,7 @@ export class OllamaProvider implements LLMProvider {
     }
 
     const raw = await this.chatJson(
-      `Generate ${input.count} multiple-choice questions on ${context}. Each has exactly 4 options and one correct answer (correctIndex). Respond as a JSON array.`,
+      `Generate ${input.count} multiple-choice questions on ${context}. Each has exactly 4 options and one correct answer (correctIndex).${conceptClause(input)} Respond as a JSON array.`,
       MCQ_SCHEMA,
     );
     const parsed = parseLlmMcqs(raw);

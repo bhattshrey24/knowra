@@ -2,6 +2,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { POST } from "@/app/api/quiz/route";
 import { __resetRateLimit } from "@/lib/rate-limit";
+import { buildTaxonomy, conceptsForScope } from "@/lib/learning/taxonomy";
+import { SEED_TAXONOMY } from "@/lib/taxonomy/seed";
+
+// Without a backend, the route resolves the taxonomy from the seed.
+const mathConcepts = new Set(
+  conceptsForScope(buildTaxonomy(SEED_TAXONOMY), "subject", "mathematics"),
+);
 
 function post(body: unknown, ip = "test-ip") {
   return POST(
@@ -24,11 +31,25 @@ describe("POST /api/quiz", () => {
     expect(data.questions).toHaveLength(4);
     for (const q of data.questions) {
       expect(q.id).toBeTruthy();
-      expect(q.conceptId).toBe("mathematics");
+      // Every question maps to a real mathematics concept (Phase 6.1), not the
+      // bare subject slug.
+      expect(mathConcepts.has(q.conceptId)).toBe(true);
       expect(q.format).toBe("mcq");
       expect(q.options.length).toBeGreaterThanOrEqual(2);
       expect(q.correctIndices).toHaveLength(1);
     }
+  });
+
+  it("maps every question to its underlying taxonomy concept", async () => {
+    const res = await post({ domain: "mathematics", difficulty: 2, count: 6 });
+    const data = await res.json();
+    expect(data.questions).toHaveLength(6);
+    for (const q of data.questions) {
+      expect(mathConcepts.has(q.conceptId)).toBe(true);
+    }
+    // The round-robin spread touches more than one concept.
+    const distinct = new Set(data.questions.map((q: { conceptId: string }) => q.conceptId));
+    expect(distinct.size).toBeGreaterThan(1);
   });
 
   it("rejects an invalid difficulty with 400", async () => {

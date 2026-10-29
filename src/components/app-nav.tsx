@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Layers, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const links = [
   { href: "/home", label: "Home", icon: Home },
@@ -40,6 +41,7 @@ export function AppNav() {
               </Link>
             );
           })}
+          <ThemeToggle />
         </nav>
       </div>
     </header>

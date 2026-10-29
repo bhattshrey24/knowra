@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Clock, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,16 @@ const FORMATS: { value: QuizFormat; label: string; hint: string }[] = [
   { value: "written", label: "Written", hint: "Type your answer" },
 ];
 
+/** Minimum / maximum questions per quiz (the setup slider range). */
+const MIN_QUESTIONS = 5;
+const MAX_QUESTIONS = 30;
+
+function formatTime(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 function FallbackNotice() {
   return (
     <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
@@ -35,18 +45,27 @@ function FallbackNotice() {
   );
 }
 
+/** A narrower topic/concept scope within the subject (Phase 6.1 navigation). */
+export type QuizScope = { level: "topic" | "concept"; id: string; name: string };
+
 export function QuizSession({
   domainSlug,
   domainName,
   recommendedDifficulty,
+  scope,
 }: {
   domainSlug: string;
   domainName: string;
   recommendedDifficulty?: Difficulty;
+  scope?: QuizScope;
 }) {
   const [status, setStatus] = useState<Status>("setup");
   const [difficulty, setDifficulty] = useState<Difficulty>(recommendedDifficulty ?? 3);
-  const [format, setFormat] = useState<QuizFormat>("mcq");
+  const [formats, setFormats] = useState<QuizFormat[]>(["mcq"]);
+  const [count, setCount] = useState(MIN_QUESTIONS);
+  const [timerEnabled, setTimerEnabled] = useState(false);
+  const [timerMinutes, setTimerMinutes] = useState(5);
+  const [remaining, setRemaining] = useState(0);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number[]>>({});
@@ -54,7 +73,14 @@ export function QuizSession({
   const [summary, setSummary] = useState<QuizSummary | null>(null);
   const [fallback, setFallback] = useState(false);
 
+  function toggleFormat(value: QuizFormat) {
+    setFormats((prev) =>
+      prev.includes(value) ? prev.filter((f) => f !== value) : [...prev, value],
+    );
+  }
+
   async function startQuiz() {
+    if (formats.length === 0) return;
     setStatus("loading");
     const controller = new AbortController();
     // Above the server LLM timeout (Gemini ~30s, local Ollama up to 60s) so the
@@ -64,7 +90,13 @@ export function QuizSession({
       const res = await fetch("/api/quiz", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ domain: domainSlug, difficulty, count: 5, format }),
+        body: JSON.stringify({
+          domain: domainSlug,
+          difficulty,
+          count,
+          formats,
+          scope: scope ? { level: scope.level, id: scope.id } : undefined,
+        }),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
@@ -75,6 +107,7 @@ export function QuizSession({
       setAnswers({});
       setWritten({});
       setCurrent(0);
+      setRemaining(timerEnabled ? timerMinutes * 60 : 0);
       setStatus("active");
     } catch {
       setStatus("error");
@@ -105,6 +138,7 @@ export function QuizSession({
         difficulty,
         answers: questions.map((q) => ({
           prompt: q.prompt,
+          conceptId: q.conceptId,
           format: q.format,
           options: q.options ?? [],
           selected: answers[q.id] ?? [],
@@ -124,11 +158,9 @@ export function QuizSession({
     return isAnswerCorrect(q.correctIndices ?? [], answers[q.id] ?? []);
   }
 
-  function advance() {
-    if (current < questions.length - 1) {
-      setCurrent((c) => c + 1);
-      return;
-    }
+  /** Grade everything answered so far and show results. Used by the last-question
+   *  button and by the countdown timer when time runs out. */
+  function finalize() {
     const results = questions.map((q) => ({
       questionId: q.id,
       selected: answers[q.id] ?? [],
@@ -146,6 +178,33 @@ export function QuizSession({
     persistAttempt();
   }
 
+  // Keep a stable handle to the latest finalize so the timer effect below can
+  // call it without re-subscribing (and without stale answers).
+  const finalizeRef = useRef(finalize);
+  finalizeRef.current = finalize;
+
+  // Tick the countdown each second while a timed quiz is active.
+  useEffect(() => {
+    if (status !== "active" || !timerEnabled) return;
+    const id = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000);
+    return () => clearInterval(id);
+  }, [status, timerEnabled]);
+
+  // When the timer hits zero, end the quiz with whatever's been answered.
+  useEffect(() => {
+    if (status === "active" && timerEnabled && remaining === 0) {
+      finalizeRef.current();
+    }
+  }, [status, timerEnabled, remaining]);
+
+  function advance() {
+    if (current < questions.length - 1) {
+      setCurrent((c) => c + 1);
+      return;
+    }
+    finalize();
+  }
+
   function reset() {
     setStatus("setup");
     setQuestions([]);
@@ -153,6 +212,7 @@ export function QuizSession({
     setAnswers({});
     setWritten({});
     setCurrent(0);
+    setRemaining(0);
     setFallback(false);
   }
 
@@ -201,30 +261,123 @@ export function QuizSession({
         </div>
 
         <div className="space-y-2">
-          <p className="text-sm font-medium">Question format</p>
+          <p className="text-sm font-medium">Question types</p>
+          <p className="text-muted-foreground text-sm">
+            Pick one or more — choose a couple and your quiz is a mix of those types.
+          </p>
           <div className="grid grid-cols-2 gap-2">
             {FORMATS.map(({ value, label, hint }) => {
-              const active = format === value;
+              const active = formats.includes(value);
               return (
                 <button
                   key={value}
                   type="button"
                   aria-pressed={active}
                   disabled={status === "loading"}
-                  onClick={() => setFormat(value)}
+                  onClick={() => toggleFormat(value)}
                   className={cn(
-                    "rounded-lg border p-3 text-left transition-colors disabled:opacity-60",
+                    "flex items-start gap-3 rounded-lg border p-3 text-left transition-colors disabled:opacity-60",
                     active
                       ? "border-primary bg-accent text-accent-foreground"
                       : "hover:border-primary/40",
                   )}
                 >
-                  <div className="text-sm font-medium">{label}</div>
-                  <div className="text-muted-foreground text-xs">{hint}</div>
+                  <span
+                    className={cn(
+                      "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm border",
+                      active ? "border-primary bg-primary text-primary-foreground" : "border-input",
+                    )}
+                    aria-hidden
+                  >
+                    {active && <Check className="size-3" />}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-medium">{label}</span>
+                    <span className="text-muted-foreground block text-xs">{hint}</span>
+                  </span>
                 </button>
               );
             })}
           </div>
+          {formats.length === 0 && (
+            <p className="text-destructive text-xs">Choose at least one question type.</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Number of questions</p>
+            <span className="text-sm font-semibold tabular-nums">{count}</span>
+          </div>
+          <input
+            type="range"
+            min={MIN_QUESTIONS}
+            max={MAX_QUESTIONS}
+            step={1}
+            value={count}
+            disabled={status === "loading"}
+            onChange={(e) => setCount(Number(e.target.value))}
+            aria-label="Number of questions"
+            className="accent-primary w-full cursor-pointer disabled:opacity-60"
+          />
+          <div className="text-muted-foreground flex justify-between text-[11px]">
+            <span>{MIN_QUESTIONS}</span>
+            <span>{MAX_QUESTIONS}</span>
+          </div>
+        </div>
+
+        <div className="space-y-3 rounded-lg border p-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <Clock className="text-muted-foreground size-4" />
+              Timer
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={timerEnabled}
+              aria-label="Enable timer"
+              disabled={status === "loading"}
+              onClick={() => setTimerEnabled((v) => !v)}
+              className={cn(
+                "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-60",
+                timerEnabled ? "bg-primary" : "bg-input",
+              )}
+            >
+              <span
+                className={cn(
+                  "inline-block size-5 rounded-full bg-white shadow transition-transform",
+                  timerEnabled ? "translate-x-5" : "translate-x-0.5",
+                )}
+              />
+            </button>
+          </div>
+          {timerEnabled && (
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="timer-minutes" className="text-muted-foreground text-sm">
+                Minutes
+              </label>
+              <input
+                id="timer-minutes"
+                type="number"
+                min={1}
+                max={120}
+                value={timerMinutes}
+                disabled={status === "loading"}
+                onChange={(e) =>
+                  setTimerMinutes(Math.max(1, Math.min(120, Number(e.target.value) || 1)))
+                }
+                className="bg-background focus-visible:border-primary focus-visible:ring-ring/40 w-20 rounded-md border px-2 py-1 text-sm outline-none focus-visible:ring-2"
+              />
+            </div>
+          )}
+          <p className="text-muted-foreground text-xs">
+            {timerEnabled
+              ? `Your quiz ends automatically after ${timerMinutes} minute${
+                  timerMinutes === 1 ? "" : "s"
+                } — unanswered questions are marked wrong.`
+              : "Turn on to race a countdown — the quiz auto-submits when time's up."}
+          </p>
         </div>
 
         {status === "error" && (
@@ -233,7 +386,11 @@ export function QuizSession({
           </p>
         )}
 
-        <Button size="lg" onClick={startQuiz} disabled={status === "loading"}>
+        <Button
+          size="lg"
+          onClick={startQuiz}
+          disabled={status === "loading" || formats.length === 0}
+        >
           {status === "loading" ? (
             <>
               <Loader2 className="size-4 animate-spin" />
@@ -353,8 +510,22 @@ export function QuizSession({
           <span>
             Question {current + 1} of {questions.length}
           </span>
-          <span className="inline-flex items-center gap-1">
-            <Sparkles className="size-3" /> Level {difficulty}
+          <span className="inline-flex items-center gap-3">
+            {timerEnabled && (
+              <span
+                role="timer"
+                aria-label="Time remaining"
+                className={cn(
+                  "inline-flex items-center gap-1 tabular-nums",
+                  remaining <= 10 && "text-destructive font-medium",
+                )}
+              >
+                <Clock className="size-3" /> {formatTime(remaining)}
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1">
+              <Sparkles className="size-3" /> Level {difficulty}
+            </span>
           </span>
         </div>
         <Progress value={((current + 1) / questions.length) * 100} />
