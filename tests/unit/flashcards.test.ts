@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildFlashcardsFromQuiz, type QuizAnswerInput } from "@/lib/learning/flashcards";
+import {
+  buildFlashcardsFromQuiz,
+  orderByConceptWeakness,
+  type QuizAnswerInput,
+} from "@/lib/learning/flashcards";
 
 const q = (over: Partial<QuizAnswerInput>): QuizAnswerInput => ({
   prompt: "What is 2 + 2?",
@@ -43,5 +47,31 @@ describe("buildFlashcardsFromQuiz", () => {
     expect(card.type).toBe("weakness");
     expect(card.back).toContain("a");
     expect(card.back).toContain("c");
+  });
+
+  it("carries the concept id onto the card", () => {
+    const [card] = buildFlashcardsFromQuiz([q({ selected: [0], conceptId: "fractions" })]);
+    expect(card.conceptId).toBe("fractions");
+  });
+});
+
+describe("orderByConceptWeakness", () => {
+  it("orders weakest concepts first, neutral for unknown/untagged", () => {
+    const cards = [
+      { id: "strong", conceptId: "s" },
+      { id: "weak", conceptId: "w" },
+      { id: "unknown", conceptId: "u" }, // no mastery → neutral 0.5
+      { id: "untagged" }, // no concept → neutral 0.5
+    ];
+    const mastery = new Map([
+      ["s", 0.9],
+      ["w", 0.1],
+    ]);
+    expect(orderByConceptWeakness(cards, mastery).map((c) => c.id)).toEqual([
+      "weak",
+      "unknown",
+      "untagged",
+      "strong",
+    ]);
   });
 });
