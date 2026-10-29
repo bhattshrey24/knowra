@@ -92,9 +92,11 @@ validates every taxonomy relationship, question structure, answer key, and diffi
   quizzing at any level (scope-aware generation, from the homepage step); concept-level mastery
   tracking — deterministic `foldConceptMastery` + `aggregateByLevel` (concept→topic→subject),
   unit-tested; migration `0008` (`concept_mastery` + `attempt_answers.concept_id`); `/api/attempts`
-  records each tagged answer's outcome and updates concept mastery. Next: aggregate into the
-  dashboard/flashcards, balanced subject-quiz selection, and a min-evidence gate before calling a
-  concept weak/mastered._
+  records each tagged answer's outcome and updates concept mastery. Balanced subject/topic-quiz
+  selection — `selectConceptsForQuiz` (unit-tested) picks a weak / unassessed / retention-due mix
+  with a min-evidence gate (never weak/mastered from a single response); `/api/quiz` uses it with
+  the learner's `concept_mastery` (degrades to a clean spread without data). Next: surface the
+  concept→topic→subject rollups on the dashboard and make flashcards/revision concept-aware._
 - ⬜ **6.3 Search & create:** Homepage search bar over existing subjects/topics/concepts. If no
   match, the user describes what they want to learn; the LLM proposes a classification, checks for
   duplicates and valid relationships, and the user can correct it before saving.

@@ -7,8 +7,10 @@ import { MockLLMProvider } from "@/lib/llm/mock";
 import { resolveLearnable } from "@/lib/db/learnable-server";
 import { allocateFormatCounts, interleaveByFormat } from "@/lib/learning/quiz-composition";
 import { getTaxonomy } from "@/lib/db/taxonomy-server";
-import { conceptsForScope, subjectsOfConcept } from "@/lib/learning/taxonomy";
+import { conceptsForScope, subjectsOfConcept, type Taxonomy } from "@/lib/learning/taxonomy";
 import { assignConceptIds, type AllowedConcept } from "@/lib/learning/concept-tagging";
+import { selectConceptsForQuiz } from "@/lib/learning/concept-selection";
+import { fetchConceptMastery } from "@/lib/db/concept-mastery-server";
 import type { TaxonomyLevel } from "@/types/learning";
 import { rateLimit } from "@/lib/rate-limit";
 import type { Difficulty, Question, QuestionFormat } from "@/types/learning";
@@ -43,13 +45,22 @@ type GenInput = {
   concepts?: AllowedConcept[];
 };
 
+function toAllowed(ids: string[], tax: Taxonomy): AllowedConcept[] {
+  return ids
+    .map((cid) => tax.conceptById.get(cid))
+    .filter((c): c is NonNullable<typeof c> => Boolean(c))
+    .map((c) => ({ id: c.id, name: c.name }));
+}
+
 /**
- * The taxonomy concepts a quiz draws from. Defaults to every concept under the
- * subject; narrows to a single topic or concept when a valid in-subject scope
- * is given. Empty for custom topics (not in the taxonomy).
+ * The taxonomy concepts a quiz draws from. A concept scope is just that
+ * concept; a subject or topic scope is a *balanced* selection of its concepts
+ * — weak, unassessed, and retention-due (Phase 6.2) — sized to the quiz. Empty
+ * for custom topics (not in the taxonomy).
  */
 async function conceptsForQuiz(
   subjectSlug: string,
+  count: number,
   scope?: { level: "topic" | "concept"; id: string },
 ): Promise<AllowedConcept[]> {
   const tax = await getTaxonomy();
@@ -64,10 +75,24 @@ async function conceptsForQuiz(
     id = scope.id;
   }
 
-  return conceptsForScope(tax, level, id)
-    .map((cid) => tax.conceptById.get(cid))
-    .filter((c): c is NonNullable<typeof c> => Boolean(c))
-    .map((c) => ({ id: c.id, name: c.name }));
+  const scopeConceptIds = conceptsForScope(tax, level, id);
+  if (scopeConceptIds.length === 0) return [];
+  if (level === "concept") return toAllowed(scopeConceptIds, tax);
+
+  // Subject / topic: balance the selection by the learner's concept mastery.
+  const mastery = await fetchConceptMastery(scopeConceptIds);
+  const selected = selectConceptsForQuiz(
+    scopeConceptIds.map((cid) => ({
+      id: cid,
+      state: mastery.get(cid)?.state,
+      lastSeenDaysAgo: mastery.get(cid)?.lastSeenDaysAgo,
+    })),
+    count,
+  );
+  return toAllowed(
+    selected.map((s) => s.id),
+    tax,
+  );
 }
 
 /**
@@ -130,7 +155,9 @@ export async function POST(req: Request): Promise<Response> {
   // Scope a predefined subject (optionally narrowed to a topic/concept) to its
   // taxonomy concepts so every question maps to one (Phase 6.1). Custom topics
   // aren't in the taxonomy — they keep their own slug as the concept id.
-  const allowedConcepts = learnable.isCustom ? [] : await conceptsForQuiz(learnable.slug, scope);
+  const allowedConcepts = learnable.isCustom
+    ? []
+    : await conceptsForQuiz(learnable.slug, count, scope);
 
   const provider = getLLMProvider();
   const genInput: GenInput = {
