@@ -92,9 +92,12 @@ validates every taxonomy relationship, question structure, answer key, and diffi
 - ⬜ **6.3 Search & create:** Homepage search bar over existing subjects/topics/concepts. If no
   match, the user describes what they want to learn; the LLM proposes a classification, checks for
   duplicates and valid relationships, and the user can correct it before saving.
-- ⬜ **6.4 Initial taxonomy seed:** Seed the DB with a diverse, reasonably comprehensive set of
+- 🟨 **6.4 Initial taxonomy seed:** Seed the DB with a diverse, reasonably comprehensive set of
   subjects, topics, and concepts. The taxonomy expands as users explore new areas, **without
-  creating duplicate entries**.
+  creating duplicate entries**. _Landed: a 24-subject catalogue (~75 topics, ~215 concepts) across
+  STEM, humanities, arts, social science, business and more (`taxonomy/seed.ts`, derived from
+  `DOMAINS` so every subject is quizzable). Loading into the DB still needs migration `0007`
+  applied + `POST /api/admin/seed-taxonomy`; until then `getTaxonomy()` serves this seed._
 - ⬜ **6.5 Adaptive diagnostics:** When a user picks an area with insufficient history, offer a
   short adaptive diagnostic to estimate concept-level mastery. Users may skip and start learning;
   mastery stays **uncertain** until there's enough evidence. Reuse reliable existing performance

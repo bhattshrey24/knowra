@@ -1,9 +1,10 @@
 import type { Domain } from "@/types/learning";
 
 /**
- * Predefined learning domains shown on the home page (FEATURES.md #1).
- * This is the single source of truth reused by the UI now and by the
- * database seed later. `icon` names map to lucide-react icons.
+ * Predefined learning subjects — the single source of truth for the taxonomy's
+ * top level (reused by `predefinedLearnable`, the quiz route, and the taxonomy
+ * seed in `src/lib/taxonomy/seed.ts`). `icon` names map to lucide-react icons
+ * via `src/lib/subject-icons.ts`.
  */
 export const DOMAINS: Domain[] = [
   {
@@ -21,11 +22,32 @@ export const DOMAINS: Domain[] = [
     icon: "FlaskConical",
   },
   {
+    id: "computer-science",
+    slug: "computer-science",
+    name: "Computer Science",
+    description: "Programming, algorithms, data, and how computers work.",
+    icon: "Code2",
+  },
+  {
     id: "history",
     slug: "history",
     name: "History",
     description: "Civilisations, turning points, and the people who shaped them.",
     icon: "Landmark",
+  },
+  {
+    id: "geography",
+    slug: "geography",
+    name: "Geography",
+    description: "Landforms, climates, maps, and the human world.",
+    icon: "Map",
+  },
+  {
+    id: "economics",
+    slug: "economics",
+    name: "Economics",
+    description: "Markets, money, growth, and how resources are allocated.",
+    icon: "LineChart",
   },
   {
     id: "world-politics",
@@ -35,10 +57,122 @@ export const DOMAINS: Domain[] = [
     icon: "Globe2",
   },
   {
+    id: "philosophy",
+    slug: "philosophy",
+    name: "Philosophy",
+    description: "Ethics, logic, knowledge, and the big questions.",
+    icon: "ScrollText",
+  },
+  {
+    id: "psychology",
+    slug: "psychology",
+    name: "Psychology",
+    description: "The mind, behaviour, memory, and development.",
+    icon: "Brain",
+  },
+  {
+    id: "sociology",
+    slug: "sociology",
+    name: "Sociology",
+    description: "Societies, culture, institutions, and social change.",
+    icon: "Users",
+  },
+  {
+    id: "literature",
+    slug: "literature",
+    name: "Literature",
+    description: "Poetry, prose, genres, and literary movements.",
+    icon: "BookText",
+  },
+  {
+    id: "linguistics",
+    slug: "linguistics",
+    name: "Linguistics",
+    description: "Sounds, grammar, meaning, and how language works.",
+    icon: "Languages",
+  },
+  {
     id: "music",
     slug: "music",
     name: "Music",
     description: "Theory, history, instruments, and how sound works.",
     icon: "Music2",
+  },
+  {
+    id: "art-and-design",
+    slug: "art-and-design",
+    name: "Art & Design",
+    description: "Art history, visual principles, and making images.",
+    icon: "Palette",
+  },
+  {
+    id: "film-and-media",
+    slug: "film-and-media",
+    name: "Film & Media",
+    description: "Cinema history, technique, and the media we consume.",
+    icon: "Clapperboard",
+  },
+  {
+    id: "astronomy",
+    slug: "astronomy",
+    name: "Astronomy",
+    description: "Planets, stars, galaxies, and the cosmos.",
+    icon: "Telescope",
+  },
+  {
+    id: "environmental-science",
+    slug: "environmental-science",
+    name: "Environmental Science",
+    description: "Ecosystems, climate, energy, and sustainability.",
+    icon: "Leaf",
+  },
+  {
+    id: "health-and-medicine",
+    slug: "health-and-medicine",
+    name: "Health & Medicine",
+    description: "Anatomy, nutrition, disease, and the immune system.",
+    icon: "Stethoscope",
+  },
+  {
+    id: "sports-and-fitness",
+    slug: "sports-and-fitness",
+    name: "Sports & Fitness",
+    description: "Exercise science, popular sports, and training.",
+    icon: "Dumbbell",
+  },
+  {
+    id: "engineering",
+    slug: "engineering",
+    name: "Engineering",
+    description: "Mechanical, electrical, and civil fundamentals.",
+    icon: "Cog",
+  },
+  {
+    id: "business-management",
+    slug: "business-management",
+    name: "Business & Management",
+    description: "Management, marketing, and building ventures.",
+    icon: "Briefcase",
+  },
+  {
+    id: "finance-and-investing",
+    slug: "finance-and-investing",
+    name: "Finance & Investing",
+    description: "Personal finance, investing, and corporate finance.",
+    icon: "PiggyBank",
+  },
+  {
+    id: "law",
+    slug: "law",
+    name: "Law",
+    description: "Types of law, legal systems, and constitutional ideas.",
+    icon: "Scale",
+  },
+  {
+    id: "religion-and-mythology",
+    slug: "religion-and-mythology",
+    name: "Religion & Mythology",
+    description: "World religions, myths, and comparative belief.",
+    icon: "Church",
   },
 ];

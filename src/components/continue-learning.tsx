@@ -1,23 +1,7 @@
 import Link from "next/link";
-import {
-  BookOpen,
-  ChevronRight,
-  FlaskConical,
-  Globe2,
-  Landmark,
-  Music2,
-  Sigma,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-
-const SUBJECT_ICONS: Record<string, LucideIcon> = {
-  mathematics: Sigma,
-  science: FlaskConical,
-  history: Landmark,
-  "world-politics": Globe2,
-  music: Music2,
-};
+import { subjectIcon } from "@/lib/subject-icons";
 
 export interface RecentSubject {
   slug: string;
@@ -36,7 +20,7 @@ export function ContinueLearning({ data }: { data: ContinueLearningData }) {
   return (
     <div className="divide-y overflow-hidden rounded-xl border">
       {data.recent.map((r) => {
-        const Icon = SUBJECT_ICONS[r.slug] ?? BookOpen;
+        const Icon = subjectIcon(r.slug);
         const meta =
           r.dueCount > 0
             ? `${r.dueCount} card${r.dueCount === 1 ? "" : "s"} to review`

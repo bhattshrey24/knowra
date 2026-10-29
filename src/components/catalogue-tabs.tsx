@@ -2,19 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  BookOpen,
-  ChevronRight,
-  FlaskConical,
-  Globe2,
-  Landmark,
-  Music2,
-  Sigma,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { quizHref, type Catalogue } from "@/lib/taxonomy/catalogue";
+import { subjectIcon } from "@/lib/subject-icons";
 
 type Tab = "subjects" | "topics" | "concepts";
 
@@ -25,15 +17,7 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 /** How many cards each tab shows before "Browse all". */
-const LIMIT: Record<Tab, number> = { subjects: 4, topics: 6, concepts: 8 };
-
-const SUBJECT_ICONS: Record<string, LucideIcon> = {
-  mathematics: Sigma,
-  science: FlaskConical,
-  history: Landmark,
-  "world-politics": Globe2,
-  music: Music2,
-};
+const LIMIT: Record<Tab, number> = { subjects: 6, topics: 8, concepts: 10 };
 
 /** A muted "A → B → C" hierarchy tag. */
 function Breadcrumb({ parts }: { parts: string[] }) {
@@ -108,7 +92,7 @@ export function CatalogueTabs({ catalogue }: { catalogue: Catalogue }) {
       {tab === "subjects" && (
         <div role="tabpanel" className="grid gap-3 sm:grid-cols-2">
           {subjects.slice(0, limit).map((s) => {
-            const Icon = SUBJECT_ICONS[s.id] ?? BookOpen;
+            const Icon = subjectIcon(s.id);
             return (
               <Link
                 key={s.id}

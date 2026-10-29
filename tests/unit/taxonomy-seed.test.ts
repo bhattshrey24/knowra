@@ -14,6 +14,17 @@ describe("SEED_TAXONOMY", () => {
     expect(subjectIds).toEqual(domainSlugs);
   });
 
+  it("has a broad catalogue (20+ subjects)", () => {
+    expect(SEED_TAXONOMY.subjects.length).toBeGreaterThanOrEqual(20);
+  });
+
+  it("gives every subject at least one topic", () => {
+    const withTopics = new Set(SEED_TAXONOMY.topics.map((t) => t.subjectId));
+    for (const subject of SEED_TAXONOMY.subjects) {
+      expect(withTopics.has(subject.id)).toBe(true);
+    }
+  });
+
   it("gives every topic at least one concept", () => {
     const tax = buildTaxonomy(SEED_TAXONOMY);
     for (const topic of SEED_TAXONOMY.topics) {
