@@ -166,37 +166,25 @@ MVP feature not started is the AI assistant (#5). Each sub-item below has its ow
 > metadata. Keep all of this in the deterministic engine per the golden rules — the LLM never owns
 > taxonomy or scoring.
 
-## Phase 7 — Dashboard v2: deeper insights ⬜
+## Phase 7 — Dashboard v2: deeper insights ✅
 
-The dashboard is currently a **hybrid**: the concept/topic sections use the new hierarchy, but the
-headline stats, Focus areas, accuracy-over-time, and the **By subject** view still come from the
-legacy flat `domain_mastery`/`quiz_attempts.domain_slug` tables (so a subject number isn't the
-roll-up of its concepts). We also barely use the richest signals we already collect —
-`attempt_answers.concept_id`, per-attempt `difficulty`, timestamps, and flashcard SM-2 retention.
-This phase makes the whole dashboard concept-first and surfaces more meaningful progress insights.
+The dashboard is now concept-first and derives all progress signals from the underlying taxonomy and evidence.
+All metric computation lives in the deterministic engine (`src/lib/learning/analytics.ts`), covered by unit tests.
 
-Recommended first slice: **7.1 + 7.2 + 7.3** (makes it concept-first, adds strengths/weaknesses,
-introduces accuracy-by-difficulty). Follow the dataviz guidance for new charts; keep the theme.
-
-- ⬜ **7.1 Unify on the hierarchy + drill-down:** Derive the subject view from concept aggregation
-  (`aggregateByLevel("subject")`) so Subject → Topic → Concept are one consistent, expandable tree
-  (tap a subject → its topics → its concepts). Each node shows mastery /10 **and a coverage bar**
-  ("explored 12 of 40 concepts"), reusing the `coverage` already computed.
-- ⬜ **7.2 Mastery distribution per subject:** A stacked bar / donut of how many concepts are
-  **weak / learning / mastered / unassessed** (reuse the `concept-selection` buckets) — strengths
-  as well as weaknesses, at a glance.
-- ⬜ **7.3 Accuracy by difficulty:** A 1–5 bar chart of accuracy at each difficulty (we store
-  per-attempt difficulty + correctness), visually separating **question difficulty** from
-  **mastery** (ties to 6.6).
-- ⬜ **7.4 Retention & revision panel:** Cards **due now**, a **"due over the next 7 days"** mini-bar,
-  and a **retention rate** (% recalled from reviews) — from `flashcards`/SM-2, today only on the
-  flashcards page.
-- ⬜ **7.5 Learning momentum:** A **streak** and a GitHub-style **weekly activity heatmap** from
-  `created_at`.
-- ⬜ **7.6 Knowledge-map radar:** A radar chart of mastery across engaged subjects — one picture of
-  breadth/balance.
-- ⬜ **7.7 Per-subject accuracy trend:** Filter the existing accuracy-over-time by subject instead
-  of one global line.
+- ✅ **7.1 Unify on the hierarchy + drill-down:** Derived the subject view from concept aggregation
+  (`aggregateByLevel("subject")`). Subject → Topic → Concept is an expandable tree (`DashboardHierarchy`),
+  where each node shows mastery /10 and coverage ("explored X of Y concepts").
+- ✅ **7.2 Mastery distribution per subject:** Stacked distribution bar (`DistributionBar`) showing counts and
+  percentages for **weak / learning / mastered / unassessed** concepts for each subject at a glance.
+- ✅ **7.3 Accuracy by difficulty:** 1–5 bar chart (`DifficultyAccuracyChart`) comparing accuracy at each difficulty
+  level, visually separating **question difficulty** from **mastery**.
+- ✅ **7.4 Retention & revision panel:** Spaced repetition panel (`RetentionPanel`) displaying cards **due now**,
+  a **7-day forecast distribution**, and the SM-2 **retention rate**.
+- ✅ **7.5 Learning momentum:** Daily study **streak** with longest streak tracking and a 4-week GitHub-style
+  **activity heatmap** (`ActivityHeatmap`).
+- ✅ **7.6 Knowledge-map radar:** SVG radar chart (`KnowledgeRadar`) showing mastery breadth/balance across engaged subjects.
+- ✅ **7.7 Per-subject accuracy trend:** `AccuracyChart` now features a subject filter to inspect the accuracy timeline
+  for individual subjects as well as all subjects.
 
 > **Note:** A true **mastery-over-time** line needs historical snapshots (we only store _current_
 > mastery) — a small daily-snapshot table if we want real trend lines; otherwise accuracy-over-time
