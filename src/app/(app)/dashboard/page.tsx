@@ -260,6 +260,14 @@ export default async function DashboardPage() {
       return b.stats.mastery - a.stats.mastery || a.name.localeCompare(b.name);
     });
 
+  // Only surface subjects the learner has actually engaged — concept-level
+  // evidence, or a quiz recorded against the subject — not the whole seed
+  // catalogue.
+  const engagedSlugs = new Set(attempts.map((a) => a.domainSlug));
+  const engagedSubjects = hierarchySubjects.filter(
+    (s) => s.stats.conceptsAssessed > 0 || engagedSlugs.has(s.slug),
+  );
+
   const stats = overallStats(attempts);
   const timeline = accuracyTimeline(attempts);
   const diffAccuracy = accuracyByDifficulty(attempts);
@@ -380,17 +388,19 @@ export default async function DashboardPage() {
       )}
 
       {/* Phase 7.1 & 7.2: Subject Hierarchy Drill-down & Concept Breakdown */}
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Subjects & concept hierarchy</h2>
-          <p className="text-muted-foreground text-sm">
-            Derived directly from concept-level evidence. Tap any subject to drill down into its
-            topics and individual concepts.
-          </p>
-        </div>
+      {engagedSubjects.length > 0 && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Subjects & concept hierarchy</h2>
+            <p className="text-muted-foreground text-sm">
+              Derived directly from concept-level evidence for the subjects you&apos;ve studied. Tap
+              any subject to drill down into its topics and individual concepts.
+            </p>
+          </div>
 
-        <DashboardHierarchy subjects={hierarchySubjects} />
-      </section>
+          <DashboardHierarchy subjects={engagedSubjects} />
+        </section>
+      )}
 
       {/* Weakest Concepts List */}
       {weakConceptIds.length > 0 && (
