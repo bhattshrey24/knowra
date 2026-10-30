@@ -11,9 +11,12 @@ import { INITIAL_MASTERY, applyOutcomes, type MasteryState } from "@/lib/learnin
 import { foldConceptMastery, type ConceptOutcome } from "@/lib/learning/aggregate";
 import { buildFlashcardsFromQuiz } from "@/lib/learning/flashcards";
 import { pickAnalogyAnchor } from "@/lib/learning/connections";
+import { createLogger, errorContext } from "@/lib/log";
 import type { Difficulty } from "@/types/learning";
 
 export const runtime = "nodejs";
+
+const log = createLogger("api/attempts");
 
 const bodySchema = z.object({
   domain: z.string().min(1).max(100),
@@ -87,6 +90,11 @@ export async function POST(req: Request): Promise<Response> {
       .select("id")
       .single();
     if (attemptError || !attempt) {
+      log.error("attempt insert failed", {
+        userId: user.id,
+        domain,
+        ...(attemptError ? errorContext(attemptError) : {}),
+      });
       return NextResponse.json({ persisted: false, reason: "insert-failed" }, { status: 500 });
     }
 
@@ -246,14 +254,27 @@ export async function POST(req: Request): Promise<Response> {
               back: c.back,
             }));
           if (toInsert.length > 0) await supabase.from("flashcards").insert(toInsert);
-        } catch {
+        } catch (err) {
           // best-effort: a connection card is a bonus, never fails the attempt
+          log.warn("connection flashcard generation failed", {
+            domain,
+            anchor: anchorSlug,
+            ...errorContext(err),
+          });
         }
       }
     }
 
+    log.info("attempt persisted", {
+      userId: user.id,
+      domain,
+      correct,
+      total,
+      mastery: next.mastery,
+    });
     return NextResponse.json({ persisted: true, attemptId: attempt.id, mastery: next });
-  } catch {
+  } catch (err) {
+    log.error("attempt persistence failed", { domain, ...errorContext(err) });
     return NextResponse.json({ persisted: false, reason: "error" }, { status: 500 });
   }
 }

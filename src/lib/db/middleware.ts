@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/env";
+import { createLogger, errorContext } from "@/lib/log";
+
+const log = createLogger("auth/middleware");
 
 /**
  * Keeps the Supabase auth session fresh on each request by syncing cookies.
@@ -27,7 +30,12 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     },
   });
 
-  // Touch the user to trigger a token refresh if needed.
-  await supabase.auth.getUser();
+  // Touch the user to trigger a token refresh if needed. A thrown failure here
+  // (network/Supabase outage) is rare; log it but never block the request.
+  try {
+    await supabase.auth.getUser();
+  } catch (err) {
+    log.warn("session refresh failed", { path: request.nextUrl.pathname, ...errorContext(err) });
+  }
   return response;
 }

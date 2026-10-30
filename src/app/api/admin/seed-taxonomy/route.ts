@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { seedTaxonomy } from "@/lib/db/taxonomy-server";
 import { isSupabaseConfigured } from "@/lib/env";
+import { createLogger, errorContext } from "@/lib/log";
 
 export const runtime = "nodejs";
+
+const log = createLogger("api/admin/seed-taxonomy");
 
 /**
  * One-off trigger to load the shared taxonomy seed into the database. Guarded
@@ -31,9 +34,10 @@ export async function POST(req: Request): Promise<Response> {
 
   try {
     const result = await seedTaxonomy();
+    log.info("taxonomy seeded", { ...result });
     return NextResponse.json({ ok: true, seeded: result });
   } catch (err) {
-    console.error("[seed-taxonomy] failed:", (err as Error)?.message);
+    log.error("seeding failed", errorContext(err));
     return NextResponse.json({ error: "Failed to seed taxonomy" }, { status: 500 });
   }
 }

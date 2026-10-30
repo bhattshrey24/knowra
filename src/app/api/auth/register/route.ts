@@ -3,8 +3,11 @@ import { z } from "zod";
 import { createClient } from "@/lib/db/server";
 import { createAdminClient } from "@/lib/db/admin";
 import { isSupabaseConfigured } from "@/lib/env";
+import { createLogger, errorContext } from "@/lib/log";
 
 export const runtime = "nodejs";
+
+const log = createLogger("api/auth/register");
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -54,6 +57,11 @@ export async function POST(req: Request): Promise<Response> {
       );
 
       if (updateErr) {
+        // Client-facing (e.g. email already in use). No email/PII in the log.
+        log.warn("anonymous upgrade rejected", {
+          userId: currentUser.id,
+          ...errorContext(updateErr),
+        });
         return NextResponse.json({ error: updateErr.message }, { status: 400 });
       }
 
@@ -63,6 +71,7 @@ export async function POST(req: Request): Promise<Response> {
         updated_at: new Date().toISOString(),
       });
 
+      log.info("anonymous user upgraded to permanent", { userId: updated.user.id });
       return NextResponse.json({
         success: true,
         upgraded: true,
@@ -79,6 +88,8 @@ export async function POST(req: Request): Promise<Response> {
     });
 
     if (createErr) {
+      // Client-facing (e.g. email already registered). No email/PII in the log.
+      log.warn("registration rejected", errorContext(createErr));
       return NextResponse.json({ error: createErr.message }, { status: 400 });
     }
 
@@ -88,12 +99,14 @@ export async function POST(req: Request): Promise<Response> {
       updated_at: new Date().toISOString(),
     });
 
+    log.info("new user registered", { userId: created.user.id });
     return NextResponse.json({
       success: true,
       upgraded: false,
       userId: created.user.id,
     });
   } catch (err: unknown) {
+    log.error("registration failed", errorContext(err));
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to register account" },
       { status: 500 },

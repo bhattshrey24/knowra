@@ -3,6 +3,9 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/db/server";
 import { createAdminClient } from "@/lib/db/admin";
 import { updateProfileSchema } from "@/lib/validation/profile";
+import { createLogger, errorContext } from "@/lib/log";
+
+const log = createLogger("api/profile");
 
 export async function GET() {
   if (!isSupabaseConfigured()) {
@@ -33,6 +36,9 @@ export async function GET() {
 
   if (error && error.message.includes("avatar_url")) {
     // Fallback if migration 0010 (avatar_url) has not yet been applied to the hosted database
+    log.warn("avatar_url column missing, using fallback select (migration 0010 missing?)", {
+      userId: user.id,
+    });
     const { data: fallbackData } = await supabase
       .from("profiles")
       .select("display_name,settings,created_at")
@@ -85,6 +91,7 @@ export async function PATCH(request: Request) {
       .upsert({ id: user.id, display_name: displayName, updated_at: new Date().toISOString() });
 
     if (profileError) {
+      log.error("profile update failed", { userId: user.id, ...errorContext(profileError) });
       return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
     }
 
@@ -119,14 +126,17 @@ export async function DELETE() {
     const { error } = await admin.auth.admin.deleteUser(user.id);
 
     if (error) {
+      log.error("account deletion failed", { userId: user.id, ...errorContext(error) });
       return NextResponse.json({ error: "Failed to delete account" }, { status: 500 });
     }
 
     // Sign out the current session
     await supabase.auth.signOut();
 
+    log.info("account deleted", { userId: user.id });
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    log.error("account deletion error", { userId: user.id, ...errorContext(err) });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

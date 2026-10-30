@@ -4,8 +4,11 @@ import { createClient } from "@/lib/db/server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { customSlug, normalizeTopicTitle } from "@/lib/learnable";
 import { rateLimit } from "@/lib/rate-limit";
+import { createLogger, errorContext } from "@/lib/log";
 
 export const runtime = "nodejs";
+
+const log = createLogger("api/topics");
 
 const bodySchema = z.object({ title: z.string().min(2).max(80) });
 
@@ -45,10 +48,14 @@ export async function POST(req: Request): Promise<Response> {
     const { error } = await supabase
       .from("custom_topics")
       .upsert({ user_id: user.id, slug, title }, { onConflict: "user_id,slug" });
-    if (error) return NextResponse.json({ error: "Could not save topic" }, { status: 500 });
+    if (error) {
+      log.error("custom topic upsert failed", { userId: user.id, slug, ...errorContext(error) });
+      return NextResponse.json({ error: "Could not save topic" }, { status: 500 });
+    }
 
     return NextResponse.json({ slug, title });
-  } catch {
+  } catch (err) {
+    log.error("custom topic save failed", { slug, ...errorContext(err) });
     return NextResponse.json({ error: "error" }, { status: 500 });
   }
 }

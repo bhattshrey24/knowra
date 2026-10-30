@@ -14,9 +14,12 @@ import { planDiagnostic } from "@/lib/learning/diagnostic";
 import { fetchConceptMastery } from "@/lib/db/concept-mastery-server";
 import type { TaxonomyLevel } from "@/types/learning";
 import { rateLimit } from "@/lib/rate-limit";
+import { createLogger, errorContext } from "@/lib/log";
 import type { Difficulty, Question, QuestionFormat } from "@/types/learning";
 
 export const runtime = "nodejs";
+
+const log = createLogger("api/quiz");
 
 const bodySchema = z.object({
   domain: z.string().min(1).max(100),
@@ -201,24 +204,36 @@ export async function POST(req: Request): Promise<Response> {
     concepts: allowedConcepts.length > 0 ? allowedConcepts : undefined,
   };
 
+  const startedAt = Date.now();
   let generated;
   let usedProvider = provider.id;
   let fallback = false;
   try {
     generated = await generateMix(provider, genInput, formats);
   } catch (err) {
-    // Server log (no secrets in these messages) so the cause is visible in logs.
-    console.error(`[quiz] generation failed (provider=${provider.id}):`, (err as Error)?.message);
     if (provider.id === "mock") {
+      log.error("generation failed", {
+        provider: provider.id,
+        formats,
+        count,
+        ...errorContext(err),
+      });
       return NextResponse.json({ error: "Failed to generate questions" }, { status: 502 });
     }
     // Graceful fallback: a flaky LLM shouldn't dead-end the quiz. Serve instant
     // practice questions, clearly flagged so the UI can tell the learner.
+    log.warn("llm generation failed, using mock fallback", {
+      provider: provider.id,
+      formats,
+      count,
+      ...errorContext(err),
+    });
     try {
       generated = await generateMix(new MockLLMProvider(), genInput, formats);
       usedProvider = "mock-fallback";
       fallback = true;
-    } catch {
+    } catch (fallbackErr) {
+      log.error("mock fallback also failed", { formats, count, ...errorContext(fallbackErr) });
       return NextResponse.json({ error: "Failed to generate questions" }, { status: 502 });
     }
   }
@@ -238,6 +253,14 @@ export async function POST(req: Request): Promise<Response> {
     };
     delete question.conceptLabel;
     return question;
+  });
+
+  log.info("quiz generated", {
+    domain: learnable.slug,
+    provider: usedProvider,
+    fallback,
+    questions: questions.length,
+    ms: Date.now() - startedAt,
   });
 
   return NextResponse.json({
