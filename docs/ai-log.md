@@ -5,6 +5,41 @@ Newest first.
 
 ---
 
+## 2026-10-30 — AI study-plan advisor (guardrailed; engine decides, LLM phrases)
+
+Branch **`feat/ai-study-plan`**. Added an AI "what to do next" advisor that sits _on top of_ the
+deterministic knowledge profile without compromising the golden rule (the LLM never measures or
+decides weaknesses).
+
+**Design — who does what:**
+
+- **Engine decides the facts.** `buildStudyFocus` (`src/lib/learning/study-plan.ts`) selects the
+  focus concepts and the reason — due-for-review first (spaced repetition is time-sensitive), then
+  the balanced weak → unassessed → retention selection reused from `selectConceptsForQuiz`.
+- **LLM only phrases/orders.** `LLMProvider.generateStudyPlan` (mock/gemini/ollama) turns the focus
+  into a readable plan. The mock implementation returns the deterministic template, keeping dev/tests
+  stable.
+
+**Guardrails:**
+
+- `parseStudyPlan` (`src/lib/validation/study-plan.ts`) validates shape with zod **and** drops any
+  step referencing a concept the engine didn't select, dedups, and substitutes **our** authoritative
+  concept name for the model's — so the LLM can't invent a concept or a weakness.
+- Any LLM failure falls back to `fallbackStudyPlan` (deterministic), so `POST /api/study-plan` never
+  dead-ends. It also works with no backend/session (best-effort due-count + mastery lookups).
+
+**Surfaced:** `StudyPlanCard` on the quiz setup page (predefined subjects), with loading skeleton and
+graceful "AI coaching unavailable" note when the plan is deterministic.
+
+**Tests:** `tests/unit/study-plan.test.ts`, `tests/unit/study-plan-validation.test.ts`,
+`tests/integration/study-plan-api.test.ts` (LLM success + guardrail drop, LLM-failure → deterministic
+fallback, mock, 404). All **244** unit/integration tests pass; typecheck, lint, Prettier, build green.
+
+**Product framing:** upgrades Knowra from "tracks your knowledge profile" to "tracks it **and**
+coaches what to do next" — the engine measures objectively; the AI explains on top of real data.
+
+---
+
 ## 2026-10-30 — Curated sample question bank + LLM-first quiz flow with graceful fallback
 
 Branch **`feat/ollama-provider`**. Replaced the generic `MockLLMProvider` quiz fallback with a

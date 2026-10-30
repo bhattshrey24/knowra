@@ -112,3 +112,38 @@ export interface ConceptMastery {
   intervalDays: number;
   ease: number;
 }
+
+/**
+ * Study-plan types (AI advisor). The deterministic engine computes the *facts*
+ * (which concepts to focus on and why); the LLM only turns those facts into a
+ * readable plan. The LLM never decides what a learner is weak at.
+ */
+export type StudyFocusStatus = "weak" | "unassessed" | "due" | "strong";
+
+/** One concept the engine has flagged for attention, with the reason. */
+export interface StudyFocusItem {
+  conceptId: string;
+  conceptName: string;
+  status: StudyFocusStatus;
+  /** 0..1 mastery when known. */
+  mastery?: number;
+  /** Flashcards currently due for this concept, when known. */
+  dueCount?: number;
+}
+
+export type StudyAction = "learn" | "review" | "strengthen";
+
+/** One actionable step in a study plan, always tied to a real concept. */
+export interface StudyStep {
+  conceptId: string;
+  conceptName: string;
+  action: StudyAction;
+  /** Short rationale (LLM-written, or templated in the deterministic fallback). */
+  reason: string;
+}
+
+export interface StudyPlan {
+  overview: string;
+  steps: StudyStep[];
+  encouragement?: string;
+}

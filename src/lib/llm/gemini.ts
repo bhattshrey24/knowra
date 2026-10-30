@@ -15,10 +15,14 @@ import type {
   GeneratedFlashcard,
   GeneratedQuestion,
   GenerateQuestionsInput,
+  GenerateStudyPlanInput,
   GradeWrittenResult,
   LLMProvider,
 } from "@/lib/llm/provider";
+import type { StudyPlan } from "@/types/learning";
 import { parseClassified } from "@/lib/validation/classify";
+import { parseStudyPlan } from "@/lib/validation/study-plan";
+import { buildStudyPlanPrompt } from "@/lib/llm/study-plan-prompt";
 import {
   parseLlmMcqs,
   parseLlmMulti,
@@ -86,6 +90,27 @@ const CLASSIFY_RESPONSE_SCHEMA = {
   required: ["subject", "topic", "concept"],
 } as const;
 
+const STUDY_PLAN_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    overview: { type: "STRING" },
+    steps: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          conceptId: { type: "STRING" },
+          action: { type: "STRING" },
+          reason: { type: "STRING" },
+        },
+        required: ["conceptId", "action", "reason"],
+      },
+    },
+    encouragement: { type: "STRING" },
+  },
+  required: ["overview", "steps"],
+} as const;
+
 export class GeminiProvider implements LLMProvider {
   readonly id = "gemini";
 
@@ -147,6 +172,14 @@ export class GeminiProvider implements LLMProvider {
       `In 2-3 sentences, explain the underlying concept clearly and encouragingly.`,
     ].join(" ");
     return this.generateText(prompt);
+  }
+
+  async generateStudyPlan(input: GenerateStudyPlanInput): Promise<StudyPlan> {
+    const { prompt, allowedById } = buildStudyPlanPrompt(input);
+    const raw = await this.generateJson(prompt, STUDY_PLAN_RESPONSE_SCHEMA);
+    const parsed = parseStudyPlan(raw, allowedById);
+    if (!parsed.success) throw new Error(`Gemini returned invalid study plan: ${parsed.error}`);
+    return parsed.data;
   }
 
   async generateFlashcards(): Promise<GeneratedFlashcard[]> {
