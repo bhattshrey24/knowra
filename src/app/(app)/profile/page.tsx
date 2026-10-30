@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/button-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/db/client";
 import { isSupabaseConfigured } from "@/lib/env";
@@ -132,7 +133,7 @@ export default function ProfilePage() {
     return (
       <div className="mx-auto max-w-lg space-y-4 py-12 text-center">
         <p className="text-muted-foreground text-sm">Please sign in to view your profile.</p>
-        <Button render={<Link href="/login" />}>Sign in or Create Account</Button>
+        <ButtonLink href="/login">Sign in or Create Account</ButtonLink>
       </div>
     );
   }
@@ -188,9 +189,9 @@ export default function ProfilePage() {
                   <Badge variant="outline" className="text-xs">
                     Guest session
                   </Badge>
-                  <Button size="sm" render={<Link href="/login" />}>
+                  <ButtonLink size="sm" href="/login">
                     Upgrade
-                  </Button>
+                  </ButtonLink>
                 </div>
               ) : (
                 <Badge

@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { Layers } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/button-link";
 import { EmptyState } from "@/components/empty-state";
 import { FlashcardsBrowser } from "@/components/flashcards-browser";
 import { type ReviewCard } from "@/components/flashcard-review";
@@ -75,7 +74,7 @@ export default async function FlashcardsPage() {
           title="No cards yet"
           description="Answer a quiz and Knowra turns your mistakes into weakness cards and your wins into foundational cards."
         >
-          <Button render={<Link href="/home" />}>Take a quiz</Button>
+          <ButtonLink href="/home">Take a quiz</ButtonLink>
         </EmptyState>
       </div>
     );

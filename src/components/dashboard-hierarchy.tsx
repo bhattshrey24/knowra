@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronDown, ChevronRight, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/button-link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { quizHref } from "@/lib/taxonomy/catalogue";
@@ -179,10 +180,10 @@ export function DashboardHierarchy({ subjects }: { subjects: SubjectHierarchyIte
                     <span className="text-base font-semibold">{outOfTen}</span>
                     <span className="text-muted-foreground text-xs">/10</span>
                   </div>
-                  <Button size="sm" variant="outline" render={<Link href={`/quiz/${sub.slug}`} />}>
+                  <ButtonLink size="sm" variant="outline" href={`/quiz/${sub.slug}`}>
                     Practise
                     <ArrowRight className="size-3.5" />
-                  </Button>
+                  </ButtonLink>
                 </div>
               </div>
             </CardHeader>

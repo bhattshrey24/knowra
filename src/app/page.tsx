@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { ArrowRight, Brain, Target, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/button-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const principles = [
@@ -28,9 +27,9 @@ export default function LandingPage() {
         <span className="text-lg font-semibold tracking-tight">
           Knowra<span className="text-primary">.</span>
         </span>
-        <Button render={<Link href="/home" />} variant="ghost" size="sm">
+        <ButtonLink href="/home" variant="ghost" size="sm">
           Open app
-        </Button>
+        </ButtonLink>
       </header>
 
       <section className="flex flex-1 flex-col items-center justify-center py-16 text-center">
@@ -46,13 +45,13 @@ export default function LandingPage() {
           revision so knowledge sticks for the long term.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Button render={<Link href="/home" />} size="lg">
+          <ButtonLink href="/home" size="lg">
             Start a quiz
             <ArrowRight className="size-4" />
-          </Button>
-          <Button render={<Link href="/dashboard" />} size="lg" variant="outline">
+          </ButtonLink>
+          <ButtonLink href="/dashboard" size="lg" variant="outline">
             See the dashboard
-          </Button>
+          </ButtonLink>
         </div>
       </section>
 

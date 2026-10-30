@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, BarChart3, Flame, Target } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/button-link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
@@ -173,7 +173,7 @@ export default async function DashboardPage() {
           title="No activity yet"
           description="Take your first quiz and your knowledge profile, mastery estimates, and trends will appear here."
         >
-          <Button render={<Link href="/home" />}>Start a quiz</Button>
+          <ButtonLink href="/home">Start a quiz</ButtonLink>
         </EmptyState>
       </div>
     );
@@ -348,10 +348,10 @@ export default async function DashboardPage() {
                   <span className="text-sm font-medium">{displayName(area.slug, titles)}</span>
                   <Badge variant="secondary">{FOCUS_LABEL[area.reason]}</Badge>
                 </div>
-                <Button size="sm" variant="outline" render={<Link href={`/quiz/${area.slug}`} />}>
+                <ButtonLink size="sm" variant="outline" href={`/quiz/${area.slug}`}>
                   Practise
                   <ArrowRight className="size-3.5" />
-                </Button>
+                </ButtonLink>
               </div>
             ))}
           </CardContent>

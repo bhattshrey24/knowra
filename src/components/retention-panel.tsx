@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { ArrowRight, Clock } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/button-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { RetentionSummary } from "@/lib/learning/analytics";
 
@@ -17,10 +16,10 @@ export function RetentionPanel({ stats }: { stats: RetentionSummary }) {
             <Clock className="text-primary size-4" />
             Spaced repetition & retention
           </CardTitle>
-          <Button size="sm" variant="outline" render={<Link href="/flashcards" />}>
+          <ButtonLink size="sm" variant="outline" href="/flashcards">
             Review cards
             <ArrowRight className="size-3.5" />
-          </Button>
+          </ButtonLink>
         </div>
         <p className="text-muted-foreground text-xs">
           How knowledge is persisting in memory through active-recall flashcards and SM-2
