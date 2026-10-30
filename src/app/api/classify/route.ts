@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getLLMProvider } from "@/lib/llm";
-import { MockLLMProvider } from "@/lib/llm/mock";
 import { getTaxonomy } from "@/lib/db/taxonomy-server";
 import { resolveClassification } from "@/lib/learning/classify";
 import { rateLimit } from "@/lib/rate-limit";
@@ -47,11 +46,21 @@ export async function POST(req: Request): Promise<Response> {
   try {
     proposed = await provider.classify({ query, subjects });
   } catch (err) {
-    log.warn("classify failed, using mock fallback", {
+    // Classifying new learning content has no curated equivalent — there's
+    // nothing to fall back to — so when the LLM is down we tell the user to try
+    // again later rather than silently guessing with the mock provider.
+    log.warn("classify failed, reporting unavailable", {
       provider: provider.id,
       ...errorContext(err),
     });
-    proposed = await new MockLLMProvider().classify({ query, subjects });
+    return NextResponse.json(
+      {
+        error:
+          "The AI is temporarily unavailable, so we can't add new topics right now. Please try again in a few minutes.",
+        reason: "unavailable",
+      },
+      { status: 503 },
+    );
   }
 
   return NextResponse.json({ classification: resolveClassification(proposed, tax) });

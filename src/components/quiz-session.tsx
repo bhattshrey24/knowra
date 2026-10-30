@@ -39,8 +39,8 @@ function formatTime(totalSeconds: number): string {
 function FallbackNotice() {
   return (
     <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
-      The AI was busy, so these are curated practice questions for this topic. Try again shortly for
-      freshly generated ones.
+      The AI is temporarily unavailable, so we&apos;ve loaded a set of our own curated practice
+      questions on this topic. Try again shortly for freshly generated, personalized ones.
     </p>
   );
 }

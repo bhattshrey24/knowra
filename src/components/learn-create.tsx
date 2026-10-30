@@ -33,15 +33,27 @@ export function LearnCreate({ query, onCancel }: { query: string; onCancel: () =
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ query }),
         });
-        if (!res.ok) throw new Error();
+        if (!res.ok) {
+          // 503 = the LLM is down; there's no curated fallback for brand-new
+          // content, so surface the server's "try again later" message.
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(
+            res.status === 503 && body?.error
+              ? body.error
+              : "Couldn't suggest a classification. Try again.",
+          );
+        }
         const data = (await res.json()) as { classification: ResolvedClassification };
         if (!active) return;
         setCls(data.classification);
         setSubject(data.classification.subject.name);
         setTopic(data.classification.topic.name);
         setConcept(data.classification.concept.name);
-      } catch {
-        if (active) setError("Couldn't suggest a classification. Try again.");
+      } catch (err) {
+        if (active)
+          setError(
+            err instanceof Error ? err.message : "Couldn't suggest a classification. Try again.",
+          );
       } finally {
         if (active) setLoading(false);
       }
