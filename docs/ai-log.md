@@ -5,6 +5,61 @@ Newest first.
 
 ---
 
+## 2026-10-30 — Structured logging, LLM provider misconfig fix (prod serving mock), provider-flow investigation
+
+Session on branch **`feat/ollama-provider`** (PRs #22 merged, #23 open). Observability plus a
+production bug where Vercel served mock/"dummy" questions despite Gemini being configured.
+
+**1. Completed — Structured logging (`src/lib/log.ts`):**
+
+- Zero-dependency structured logger (no new deps, stays $0). Writes to the console so logs appear
+  in both the local terminal and **Vercel Runtime Logs**: one JSON object per line in production
+  (queryable by field), human-readable in dev. Levels INFO/WARN/ERROR routed to the correct stream.
+- **Secrets safety:** every context object is passed through a recursive redactor that masks
+  sensitive keys (tokens, passwords, api keys, auth headers, cookies, emails) and truncates
+  oversized strings; `errorContext()` normalizes thrown values to message/name/stack without
+  spreading raw error props.
+- Instrumented the LLM boundary (`quiz`, `classify`), Supabase ops (`attempts`,
+  `flashcards/review`, `topics`, `profile`, `db/taxonomy`), auth (`register`, middleware session
+  refresh) and taxonomy seeding — replacing the ad-hoc `console.*` calls and filling previously
+  silent `catch` branches. Logs ids only, never email/PII. Covered by `tests/unit/log.test.ts`.
+
+**2. Fixed — Prod served mock questions despite `LLM_PROVIDER=gemini` (root cause: quoted env):**
+
+- `/api/quiz` returned `provider: "mock"`, meaning `getLLMProvider()` never selected Gemini.
+  Root cause: dashboards (Vercel) store env vars as **raw strings**, so a value entered as
+  `"gemini"` arrives with literal quotes and never matches `=== "gemini"`. `.env.local` works
+  because dotenv strips the quotes.
+- **Fix (`src/lib/llm/index.ts`):** added `cleanEnv()` (trim + strip one pair of wrapping quotes),
+  applied to `LLM_PROVIDER`, the Gemini/Ollama keys, model and timeout envs, so the configured
+  provider is honoured regardless of quoting. Covered by `tests/unit/llm-factory.test.ts`.
+- **Added `GET /api/health`:** non-secret runtime diagnostics (resolved provider, raw-encoded
+  `LLM_PROVIDER` shape, key presence + length, Supabase config) to diagnose such misconfig in prod
+  without exposing credentials. **Verified live: provider now resolves to `gemini` and real
+  questions are served for both authenticated and unauthenticated users.**
+
+**3. Investigated — "provider switches to mock after signing in":**
+
+- Traced both flows (API route, quiz page server component, middleware, user-mastery queries,
+  provider factory, fallback). **Provider selection takes zero auth input** — `getLLMProvider()`
+  reads only env; no BYOK/preferences/tier logic exists; authed and anon users send Gemini an
+  identical request. The only auth-correlated route to mock is the route's **fallback path** firing
+  when the Gemini call itself throws (`provider: "mock-fallback"`, `fallback: true`), distinct from
+  the env case (`provider: "mock"`). The structured WARN log surfaces the exact failure reason.
+- Locked in correct behaviour with `tests/integration/quiz-provider-flows.test.ts` (PR #23): authed
+  (with history) and new/anon (diagnostic) flows both resolve `gemini` when configured; mock and
+  mock-fallback behaviours preserved.
+
+**Current Status:**
+
+- All 211 unit/integration tests passing; `tsc --noEmit`, ESLint, Prettier, build green. LLM
+  generation confirmed working in production (Gemini) for signed-in and anonymous users.
+
+**Next recommended action:** merge PR #23; optionally add 429-aware retry/backoff to the Gemini
+provider so transient free-tier rate limits don't surface as mock fallback.
+
+---
+
 ## 2026-10-30 — Phase 7 (Dashboard v2), Phase 8 (Auth audit & RLS), CI Playwright fixes, LLM generation hardening
 
 Full-stack consolidation session on branch **`feat/ollama-provider`**. All 191 unit/integration tests passing; TypeScript (`tsc --noEmit`), ESLint, and Playwright e2e suites all passing cleanly.
