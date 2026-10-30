@@ -250,15 +250,15 @@ the engine/analytics need) → heavy user ≈ 100 KB → **~5,000 heavy / 10,000
 
 ## Outstanding / blocked
 
-- **Supabase: done.** Cloud project connected, migrations `0001`–`0010` applied, Anonymous
-  sign-ins enabled (2026-10-29). DB-backed features run live. _Optional:_ seed the taxonomy into
-  the DB via `POST /api/admin/seed-taxonomy` (needs `SEED_TOKEN`); until then `getTaxonomy()` serves
-  the in-memory 24-subject seed.
-- **LLM provider:** default is local **Ollama** (`llama3.2:1b`) — works but slow/modest on CPU;
-  generation now runs in ≤6-question sequential chunks to avoid timeouts. A Gemini key is present
-  for a faster/higher-quality option (`LLM_PROVIDER=gemini`, drop the `GEMINI_MODEL` line).
-- **Still to do:** #5 AI assistant (not started); open a PR from `feat/ollama-provider` into `main`
-  (branch name no longer reflects its contents); Vercel deployment (user's dashboard task).
+- **Supabase: live & verified.** Migrations `0001`–`0011` applied (including `0010_profile_avatar` and
+  `0011_flashcard_update_policy`), Anonymous sign-ins and Email/GitHub Auth enabled. Free-tier built-in
+  SMTP rate limits bypassed via server-side admin user creation (`/api/auth/register`).
+- **LLM providers:**
+  - Ollama (`llama3.2:1b`): Hardened against small-model field inversion bugs with strict `minItems: 4, maxItems: 4`
+    schema constraints, system prompt instructions, and defensive Zod validation filters against JSON/prompt leakage.
+  - Gemini: Supported natively (`LLM_PROVIDER=gemini`) via Google AI Studio (`gemini-flash-lite-latest` or `gemini-2.0-flash`).
+- **CI / Tests:** All 191 unit & integration tests passing; Playwright e2e suites passing on GitHub Actions.
+- **Still to do:** **Feature #5: AI learning assistant (chatbot)** — the single remaining MVP feature.
 - **Known limitation:** answers are also scored client-side for instant feedback, but `/api/attempts`
   **re-scores server-side** from the reference/answer key before persisting — so stored mastery is
   trustworthy. Tracked in `improve.md`.
