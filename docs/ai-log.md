@@ -5,6 +5,43 @@ Newest first.
 
 ---
 
+## 2026-10-30 — Phase 7 (Dashboard v2), Phase 8 (Auth audit & RLS), CI Playwright fixes, LLM generation hardening
+
+Full-stack consolidation session on branch **`feat/ollama-provider`**. All 191 unit/integration tests passing; TypeScript (`tsc --noEmit`), ESLint, and Playwright e2e suites all passing cleanly.
+
+**1. Completed — Phase 7: Dashboard v2 (Concept-First Deep Insights):**
+- **Deterministic Analytics Engine (`src/lib/learning/analytics.ts`):** Implemented all calculation pipelines: hierarchy drilldown (`DashboardHierarchy`), stacked mastery distribution (`DistributionBar`), accuracy by difficulty (`DifficultyAccuracyChart`), retention panel with 7-day forecast (`RetentionPanel`), study momentum streak and 4-week GitHub-style activity heatmap (`ActivityHeatmap`), SVG knowledge radar chart (`KnowledgeRadar`), and per-subject accuracy filtering.
+- Fully covered by unit tests in `tests/unit/dashboard-v2.test.ts`.
+
+**2. Completed — Phase 8: Authentication Audit, RLS Policies & Backend Hygiene:**
+- **SMTP Rate Limit Bypass:** Supabase free tier built-in SMTP limits signups to 4 emails/hour. Implemented server-side registration endpoint `POST /api/auth/register` using the admin client with `email_confirm: true`, auto-confirming users safely without hitting rate limits.
+- **OAuth Audit & UI Streamlining:** Diagnosed HTTP 400 (`Unsupported provider: provider is not enabled`) caused by unconfigured OAuth credentials in Supabase dashboard. Per user specification, removed Google OAuth from `/login` and streamlined UI to GitHub OAuth + Email/Password with helpful setup diagnostics.
+- **RLS Policy Fix for Flashcards:** Discovered that migration `0002` lacked an `UPDATE` policy on `flashcards`, causing silent review persistence failures under RLS. Created and deployed migration `0011_flashcard_update_policy.sql` (`flashcards_update_own`), accompanied by defensive fallback in `/api/flashcards/review`.
+- **Profile Endpoint Safety:** Added defensive fallback for `avatar_url` in `/api/profile` to prevent runtime crashes when running against schemas without migration `0010`.
+
+**3. Completed — Playwright e2e CI Fixes (GitHub Actions):**
+- Fixed `tests/e2e/smoke.spec.ts` heading assertion to match Phase 6 homepage copy (`"What will you learn today?"`).
+- Fixed `tests/e2e/quiz.spec.ts` to toggle `"Choose yourself"` before attempting to click specific 1–5 level cards, respecting the default adaptive difficulty toggle.
+- Configured `expect: { timeout: 15_000 }` in `playwright.config.ts` to accommodate cold Next.js route compilation in CI. GitHub Actions Run ID `40912331276` passed all jobs (1m 17s e2e execution).
+
+**4. Completed — LLM Generation Robustness & Small-Model Inversion Fixes:**
+- **Root Cause Analysis:** Discovered that ultra-small local models (`llama3.2:1b` via Ollama) inverted JSON schema fields during MCQ generation—setting `prompt` to `"Multiple Choice Questions on Mathematics"`, cramming the math problem into `options[0]` while echoing internal terms (`"What is the correctIndex..."`), and outputting JSON syntax noise (`options[4] = "],"`).
+- **Schema & Prompt Hardening (`src/lib/llm/ollama.ts`):** Enforced `minItems: 4, maxItems: 4` on `options` in `MCQ_SCHEMA` and `MULTI_SCHEMA` to leverage Ollama's GBNF grammar constraints. Added system prompt instructions and strict formatting rules.
+- **Defensive Zod Validation (`src/lib/validation/question.ts`):** Added refinements to reject generic titles as prompts (`GENERIC_HEADING_REGEX`), leaked internal fields (`correctIndex`, `Concepts:`), and JSON punctuation artifacts (`],`, `{`, `}`).
+- **Graceful Fallback:** If an LLM ever returns corrupt output, the validation rejection triggers the quiz route's built-in practice question fallback (`MockLLMProvider`), ensuring the learner never sees broken questions.
+- **Gemini Documentation & Switching:** Documented exact `.env.local` configuration for switching from Ollama to Gemini API (`LLM_PROVIDER="gemini"`, `gemini-flash-lite-latest` vs `gemini-3.8-flash`).
+
+**Current Status:**
+- Working tree clean. All unit tests (191/191) and typecheck passing.
+- Remote `feat/ollama-provider` is up to date.
+- Migrations `0001`–`0011` deployed and verified.
+
+**Exact Next Steps:**
+1. Proceed with **MVP Feature #5: AI learning assistant (chatbot)** from `FEATURES.md` — conversational tutor scoped to learner's profile, recent mistakes, and concept mastery.
+2. Build chatbot UI and streaming API route using the existing `LLMProvider` abstraction.
+
+---
+
 ## 2026-10-29 — Phase 6 (6.1–6.7) + UI redesigns + Ollama reliability
 
 Large multi-feature session on branch **`feat/ollama-provider`** (name now outdated — it holds all
