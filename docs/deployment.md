@@ -32,8 +32,25 @@ PR) to ship to Production.
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY` (secret — server only)
    - `LLM_PROVIDER` = `mock` for now (set to `gemini` + add `GOOGLE_GENERATIVE_AI_API_KEY` to use Gemini)
+
+   > ⚠️ **Enter values _without_ surrounding quotes.** `.env.local` strips quotes; the Vercel
+   > dashboard stores them literally, so a value pasted as `"gemini"` becomes the 8-char string
+   > `"gemini"` and silently falls back to the mock provider. (`getLLMProvider()` now trims and
+   > strips wrapping quotes defensively, but clean values are still best.)
+
 4. **Redeploy** the latest `main` and `dev` so they pick up the env vars (Deployments → ⋯ →
-   Redeploy), or just push.
+   Redeploy), or just push. Env vars only apply to deployments created _after_ they are set.
+
+## Troubleshooting
+
+- **Production serves mock/placeholder questions despite `LLM_PROVIDER=gemini`.** Hit
+  **`GET /api/health`** on the deployment — it reports the resolved provider and the raw shape of
+  `LLM_PROVIDER` (no secrets). If `provider` is `mock`, the var isn't matching (quotes/whitespace,
+  wrong environment scope, or no redeploy since it was set). If a quiz response shows
+  `provider: "curated"` / `"mock-fallback"`, the provider _was_ selected but the LLM call failed
+  (check the `WARN [api/quiz]` log line's `err` field — e.g. `429` = free-tier rate limit).
+- **Checking the provider in logs.** Each quiz logs `provider`, `fallback`, and timing; failures log
+  a WARN/ERROR with a redacted reason. See `src/lib/log.ts`.
 
 ## Notes
 
