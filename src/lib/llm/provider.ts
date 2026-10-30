@@ -10,7 +10,15 @@
  * Each method receives only the minimal context required for its task.
  */
 
-import type { Concept, Difficulty, Flashcard, Question, QuestionFormat } from "@/types/learning";
+import type {
+  Concept,
+  Difficulty,
+  Flashcard,
+  Question,
+  QuestionFormat,
+  StudyFocusItem,
+  StudyPlan,
+} from "@/types/learning";
 
 /**
  * Content a provider returns, before the system assigns identifiers. `id` and
@@ -83,6 +91,16 @@ export interface ClassifiedConcept {
   concept: string;
 }
 
+export interface GenerateStudyPlanInput {
+  subjectName: string;
+  /**
+   * The concepts the deterministic engine selected to focus on, with the reason
+   * (weak / unassessed / due / strong). The model plans around *these* — it must
+   * not introduce other concepts, and the caller validates that it didn't.
+   */
+  focus: StudyFocusItem[];
+}
+
 /**
  * The contract every LLM backend implements. Returned content is always
  * schema-validated by the caller (zod) before it is stored or rendered —
@@ -96,4 +114,10 @@ export interface LLMProvider {
   gradeWritten(input: GradeWrittenInput): Promise<GradeWrittenResult>;
   /** Propose where a free-text learning request fits in the taxonomy (#6.3). */
   classify(input: ClassifyInput): Promise<ClassifiedConcept>;
+  /**
+   * Turn the engine's selected focus concepts into a readable study plan. The
+   * model only narrates and orders; it must reference only the given concepts,
+   * and the caller validates + guardrails the result.
+   */
+  generateStudyPlan(input: GenerateStudyPlanInput): Promise<StudyPlan>;
 }

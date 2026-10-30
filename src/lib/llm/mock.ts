@@ -13,10 +13,13 @@ import type {
   GeneratedQuestion,
   GenerateFlashcardsInput,
   GenerateQuestionsInput,
+  GenerateStudyPlanInput,
   GradeWrittenInput,
   GradeWrittenResult,
   LLMProvider,
 } from "@/lib/llm/provider";
+import { fallbackStudyPlan } from "@/lib/learning/study-plan";
+import type { StudyPlan } from "@/types/learning";
 
 export class MockLLMProvider implements LLMProvider {
   readonly id = "mock";
@@ -112,5 +115,10 @@ export class MockLLMProvider implements LLMProvider {
         ? "Mock grading: partial credit. Connect your answer to the core concept."
         : "No answer provided.",
     };
+  }
+
+  async generateStudyPlan(input: GenerateStudyPlanInput): Promise<StudyPlan> {
+    // Deterministic: the engine's own templated plan, so dev/tests are stable.
+    return fallbackStudyPlan(input.subjectName, input.focus);
   }
 }

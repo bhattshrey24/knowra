@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { QuizSession, type QuizScope } from "@/components/quiz-session";
+import { StudyPlanCard } from "@/components/study-plan-card";
 import { predefinedLearnable } from "@/lib/learnable";
 import { resolveLearnable } from "@/lib/db/learnable-server";
 import { createClient } from "@/lib/db/server";
@@ -129,6 +130,12 @@ export default async function QuizStartPage({
           {scope ? `A ${scope.level}-level quiz in ${found.name}.` : found.description}
         </p>
       </div>
+
+      {/* AI study-plan advisor — only for taxonomy subjects (not custom topics)
+          and only at the subject level, not a topic/concept scope. */}
+      {!found.isCustom && !scope && (
+        <StudyPlanCard subjectSlug={found.slug} subjectName={found.name} />
+      )}
 
       <QuizSession
         domainSlug={found.slug}

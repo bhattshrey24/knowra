@@ -17,10 +17,14 @@ import type {
   GeneratedQuestion,
   GenerateFlashcardsInput,
   GenerateQuestionsInput,
+  GenerateStudyPlanInput,
   GradeWrittenResult,
   LLMProvider,
 } from "@/lib/llm/provider";
+import type { StudyPlan } from "@/types/learning";
 import { parseClassified } from "@/lib/validation/classify";
+import { parseStudyPlan } from "@/lib/validation/study-plan";
+import { buildStudyPlanPrompt } from "@/lib/llm/study-plan-prompt";
 import {
   parseLlmMcqs,
   parseLlmMulti,
@@ -81,6 +85,22 @@ const CLASSIFY_SCHEMA = {
   type: "object",
   properties: { subject: STRING, topic: STRING, concept: STRING },
   required: ["subject", "topic", "concept"],
+} as const;
+const STUDY_PLAN_SCHEMA = {
+  type: "object",
+  properties: {
+    overview: STRING,
+    steps: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { conceptId: STRING, action: STRING, reason: STRING },
+        required: ["conceptId", "action", "reason"],
+      },
+    },
+    encouragement: STRING,
+  },
+  required: ["overview", "steps"],
 } as const;
 
 export class OllamaProvider implements LLMProvider {
@@ -156,6 +176,18 @@ export class OllamaProvider implements LLMProvider {
     return this.chatText(
       `A learner answered "${input.question.prompt}" ${input.isCorrect ? "correctly" : "incorrectly"}. In 2-3 sentences, explain the concept clearly and encouragingly.`,
     );
+  }
+
+  async generateStudyPlan(input: GenerateStudyPlanInput): Promise<StudyPlan> {
+    const { prompt, allowedById } = buildStudyPlanPrompt(input);
+    const raw = await this.chatJson(
+      prompt,
+      STUDY_PLAN_SCHEMA,
+      "You are a study coach. Always produce valid JSON matching the schema, and reference only the concept ids provided.",
+    );
+    const parsed = parseStudyPlan(raw, allowedById);
+    if (!parsed.success) throw new Error(`Ollama invalid study plan: ${parsed.error}`);
+    return parsed.data;
   }
 
   async gradeWritten(): Promise<GradeWrittenResult> {
