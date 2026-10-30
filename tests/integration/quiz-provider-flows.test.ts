@@ -129,11 +129,13 @@ describe("mock and fallback behaviour is preserved", () => {
     expect(data.questions).toHaveLength(4);
   });
 
-  it("falls back to mock when the configured provider throws (does not dead-end)", async () => {
+  it("falls back to the curated bank when the configured provider throws (does not dead-end)", async () => {
     vi.stubEnv("LLM_PROVIDER", "gemini");
     vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "a-real-looking-key");
     // Gemini is selected but every call fails (e.g. 429 / network) — the exact
-    // production symptom that looks like a "switch to mock".
+    // production symptom. For content we curate, we serve curated questions
+    // (flagged), never mock placeholders. (The "temporarily unavailable" path
+    // for uncovered content is covered in quiz-curated-fallback.test.ts.)
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -146,8 +148,8 @@ describe("mock and fallback behaviour is preserved", () => {
     const data = await res.json();
 
     expect(res.status).toBe(200);
-    expect(data.provider).toBe("mock-fallback");
+    expect(data.provider).toBe("curated");
     expect(data.fallback).toBe(true);
-    expect(data.questions).toHaveLength(4);
+    expect(data.questions.length).toBeGreaterThan(0);
   });
 });

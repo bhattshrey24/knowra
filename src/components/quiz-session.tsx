@@ -39,8 +39,8 @@ function formatTime(totalSeconds: number): string {
 function FallbackNotice() {
   return (
     <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
-      The AI was busy, so these are instant practice questions. Try again shortly for freshly
-      generated ones.
+      The AI was busy, so these are curated practice questions for this topic. Try again shortly for
+      freshly generated ones.
     </p>
   );
 }
@@ -77,6 +77,7 @@ export function QuizSession({
   const [written, setWritten] = useState<Record<string, string>>({});
   const [summary, setSummary] = useState<QuizSummary | null>(null);
   const [fallback, setFallback] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [isDiagnostic, setIsDiagnostic] = useState(false);
 
@@ -119,6 +120,7 @@ export function QuizSession({
     setDifficulty(level);
     setIsDiagnostic(Boolean(opts?.diagnostic));
     userCancelledRef.current = false;
+    setErrorMessage(null);
     setProgress(8);
     setStatus("loading");
 
@@ -162,7 +164,18 @@ export function QuizSession({
         }),
         signal: controller.signal,
       });
-      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+      if (!res.ok) {
+        // 503 = generation temporarily unavailable (LLM down and no curated
+        // questions for this content). Surface the server's message verbatim.
+        if (res.status === 503) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          setErrorMessage(
+            body?.error ??
+              "Question generation is temporarily unavailable. Please try again in a few minutes.",
+          );
+        }
+        throw new Error(`Request failed: ${res.status}`);
+      }
       const data = (await res.json()) as { questions: Question[]; fallback?: boolean };
       if (!data.questions?.length) throw new Error("No questions returned");
 
@@ -552,7 +565,7 @@ export function QuizSession({
 
         {status === "error" && (
           <p role="alert" className="text-destructive text-sm">
-            Something went wrong generating your quiz. Please try again.
+            {errorMessage ?? "Something went wrong generating your quiz. Please try again."}
           </p>
         )}
 

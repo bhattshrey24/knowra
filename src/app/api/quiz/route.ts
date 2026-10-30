@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getLLMProvider } from "@/lib/llm";
 import type { LLMProvider } from "@/lib/llm/provider";
-import { MockLLMProvider } from "@/lib/llm/mock";
+import { curatedQuiz, type CuratedResult } from "@/lib/learning/question-bank";
 import { resolveLearnable } from "@/lib/db/learnable-server";
 import { allocateFormatCounts, interleaveByFormat } from "@/lib/learning/quiz-composition";
 import { getTaxonomy } from "@/lib/db/taxonomy-server";
@@ -65,12 +65,21 @@ function toAllowed(ids: string[], tax: Taxonomy): AllowedConcept[] {
  * — weak, unassessed, and retention-due (Phase 6.2) — sized to the quiz. Empty
  * for custom topics (not in the taxonomy).
  */
+interface QuizConcepts {
+  /** The concepts the LLM is asked to generate on (the balanced selection). */
+  allowed: AllowedConcept[];
+  /** Every concept in the requested scope — used for the curated fallback so a
+   *  failed quiz can draw curated questions from anywhere in the subject/topic,
+   *  not only the selected subset. */
+  scopeConceptIds: string[];
+}
+
 async function conceptsForQuiz(
   subjectSlug: string,
   count: number,
   scope?: { level: "topic" | "concept"; id: string },
   diagnostic?: boolean,
-): Promise<AllowedConcept[]> {
+): Promise<QuizConcepts> {
   const tax = await getTaxonomy();
 
   let level: TaxonomyLevel = "subject";
@@ -84,8 +93,8 @@ async function conceptsForQuiz(
   }
 
   const scopeConceptIds = conceptsForScope(tax, level, id);
-  if (scopeConceptIds.length === 0) return [];
-  if (level === "concept") return toAllowed(scopeConceptIds, tax);
+  if (scopeConceptIds.length === 0) return { allowed: [], scopeConceptIds: [] };
+  if (level === "concept") return { allowed: toAllowed(scopeConceptIds, tax), scopeConceptIds };
 
   // Subject / topic: select by the learner's concept mastery.
   const mastery = await fetchConceptMastery(scopeConceptIds);
@@ -107,7 +116,7 @@ async function conceptsForQuiz(
     selectedIds.length > 0
       ? selectedIds
       : selectConceptsForQuiz(candidates, count).map((s) => s.id);
-  return toAllowed(ids, tax);
+  return { allowed: toAllowed(ids, tax), scopeConceptIds };
 }
 
 /**
@@ -190,8 +199,8 @@ export async function POST(req: Request): Promise<Response> {
   // Scope a predefined subject (optionally narrowed to a topic/concept) to its
   // taxonomy concepts so every question maps to one (Phase 6.1). Custom topics
   // aren't in the taxonomy — they keep their own slug as the concept id.
-  const allowedConcepts = learnable.isCustom
-    ? []
+  const { allowed: allowedConcepts, scopeConceptIds } = learnable.isCustom
+    ? { allowed: [] as AllowedConcept[], scopeConceptIds: [] as string[] }
     : await conceptsForQuiz(learnable.slug, count, scope, diagnostic);
 
   const provider = getLLMProvider();
@@ -205,57 +214,70 @@ export async function POST(req: Request): Promise<Response> {
   };
 
   const startedAt = Date.now();
-  let generated;
+  let generated: Awaited<ReturnType<typeof generateMix>> | undefined;
+  let curated: CuratedResult[] | undefined;
   let usedProvider = provider.id;
   let fallback = false;
   try {
     generated = await generateMix(provider, genInput, formats);
   } catch (err) {
-    if (provider.id === "mock") {
-      log.error("generation failed", {
+    // Live generation failed or timed out. Fall back to the curated bank for
+    // the *requested* concepts only — never unrelated samples. When nothing is
+    // curated for this content (e.g. a custom topic), report that generation is
+    // temporarily unavailable rather than showing placeholder questions.
+    const curatedResults = curatedQuiz(scopeConceptIds, difficulty as Difficulty, formats, count);
+    if (curatedResults.length > 0) {
+      log.warn("llm generation failed, serving curated fallback", {
         provider: provider.id,
-        formats,
+        count,
+        curated: curatedResults.length,
+        ...errorContext(err),
+      });
+      curated = curatedResults;
+      usedProvider = "curated";
+      fallback = true;
+    } else {
+      log.error("llm unavailable and no curated coverage for scope", {
+        provider: provider.id,
         count,
         ...errorContext(err),
       });
-      return NextResponse.json({ error: "Failed to generate questions" }, { status: 502 });
-    }
-    // Graceful fallback: a flaky LLM shouldn't dead-end the quiz. Serve instant
-    // practice questions, clearly flagged so the UI can tell the learner.
-    log.warn("llm generation failed, using mock fallback", {
-      provider: provider.id,
-      formats,
-      count,
-      ...errorContext(err),
-    });
-    try {
-      generated = await generateMix(new MockLLMProvider(), genInput, formats);
-      usedProvider = "mock-fallback";
-      fallback = true;
-    } catch (fallbackErr) {
-      log.error("mock fallback also failed", { formats, count, ...errorContext(fallbackErr) });
-      return NextResponse.json({ error: "Failed to generate questions" }, { status: 502 });
+      return NextResponse.json(
+        {
+          error:
+            "Question generation is temporarily unavailable. Please try again in a few minutes.",
+          reason: "unavailable",
+        },
+        { status: 503 },
+      );
     }
   }
 
-  // Resolve each question's model-proposed concept label to a validated concept
-  // id; fall back to the learnable's own slug when it isn't in the taxonomy.
-  const conceptIds = assignConceptIds(
-    generated.map((g) => g.conceptLabel),
-    allowedConcepts,
-  );
-  const questions: Question[] = generated.map((g, i) => {
-    // Drop the transient concept label once resolved; it isn't part of Question.
-    const question: Question & { conceptLabel?: string } = {
-      ...g,
-      id: randomUUID(),
-      conceptId: conceptIds ? conceptIds[i] : learnable.slug,
-    };
-    delete question.conceptLabel;
-    return question;
-  });
+  // Build the final questions from whichever source produced them. Curated
+  // entries already carry a validated conceptId; generated ones resolve their
+  // model-proposed concept label to a taxonomy concept (falling back to the
+  // learnable's own slug when it isn't in the taxonomy).
+  let questions: Question[];
+  if (generated) {
+    const conceptIds = assignConceptIds(
+      generated.map((g) => g.conceptLabel),
+      allowedConcepts,
+    );
+    questions = generated.map((g, i) => {
+      const question: Question & { conceptLabel?: string } = {
+        ...g,
+        id: randomUUID(),
+        conceptId: conceptIds ? conceptIds[i] : learnable.slug,
+      };
+      delete question.conceptLabel;
+      return question;
+    });
+  } else {
+    // curated is set whenever generated is not (the catch returns otherwise).
+    questions = (curated ?? []).map((q) => ({ ...q, id: randomUUID() }));
+  }
 
-  log.info("quiz generated", {
+  log.info("quiz served", {
     domain: learnable.slug,
     provider: usedProvider,
     fallback,

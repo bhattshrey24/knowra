@@ -5,6 +5,101 @@ Newest first.
 
 ---
 
+## 2026-10-30 — Curated sample question bank + LLM-first quiz flow with graceful fallback
+
+Branch **`feat/ollama-provider`**. Replaced the generic `MockLLMProvider` quiz fallback with a
+real curated bank, and made the "no content + no LLM" case an explicit, honest stop.
+
+**Behaviour (per product spec):**
+
+- Quizzing is **LLM-first** (fresh, personalized from the learner's strengths/weaknesses/difficulty
+  as before).
+- **LLM fails/times out for covered content →** serve curated questions for the requested _scope_
+  (subject/topic/concept), flagged in the UI ("curated practice questions"). Never mock
+  placeholders.
+- **LLM unavailable AND no curated coverage (e.g. custom topic) →** `503 {reason:"unavailable"}`;
+  the UI shows "Question generation is temporarily unavailable. Please try again." Never shows
+  unrelated samples.
+- Existing **mock** provider (dev/no-key default) and normal generation path unchanged.
+
+**Implementation:**
+
+- `src/lib/learning/question-bank-data.ts` — hand-authored, correct MCQs keyed to real taxonomy
+  concepts across Mathematics, Science, Computer Science (representative coverage; other concepts
+  are LLM-only).
+- `src/lib/learning/question-bank.ts` — deterministic, LLM-independent selector (`curatedQuiz`,
+  `hasCurated`): returns curated questions for exactly the requested concepts, prefers the chosen
+  difficulty (widening only when needed), round-robins across concepts, respects format.
+- `src/app/api/quiz/route.ts` — `conceptsForQuiz` now also returns the full scope concept ids so the
+  fallback can draw from anywhere in the scope, not just the LLM-selected subset. Catch path: curated
+  → else 503. `provider` is reported as `"curated"` with `fallback: true`.
+- `src/components/quiz-session.tsx` — surfaces the 503 message in the error state; fallback notice
+  reworded to reflect curated questions.
+
+**Tests:** `tests/unit/question-bank.test.ts` (data integrity + selector), `tests/integration/
+quiz-curated-fallback.test.ts` (curated fallback + 503). Updated `quiz-provider-flows.test.ts` for
+the new curated contract. All 225 unit/integration tests pass; typecheck, lint, Prettier, build green.
+
+**Follow-up:** curated coverage is partial by design — extend the bank to more subjects as needed;
+consider loading it into the DB if curated content should be user-expandable.
+
+---
+
+## 2026-10-30 — Structured logging, LLM provider misconfig fix (prod serving mock), provider-flow investigation
+
+Session on branch **`feat/ollama-provider`** (PRs #22 merged, #23 open). Observability plus a
+production bug where Vercel served mock/"dummy" questions despite Gemini being configured.
+
+**1. Completed — Structured logging (`src/lib/log.ts`):**
+
+- Zero-dependency structured logger (no new deps, stays $0). Writes to the console so logs appear
+  in both the local terminal and **Vercel Runtime Logs**: one JSON object per line in production
+  (queryable by field), human-readable in dev. Levels INFO/WARN/ERROR routed to the correct stream.
+- **Secrets safety:** every context object is passed through a recursive redactor that masks
+  sensitive keys (tokens, passwords, api keys, auth headers, cookies, emails) and truncates
+  oversized strings; `errorContext()` normalizes thrown values to message/name/stack without
+  spreading raw error props.
+- Instrumented the LLM boundary (`quiz`, `classify`), Supabase ops (`attempts`,
+  `flashcards/review`, `topics`, `profile`, `db/taxonomy`), auth (`register`, middleware session
+  refresh) and taxonomy seeding — replacing the ad-hoc `console.*` calls and filling previously
+  silent `catch` branches. Logs ids only, never email/PII. Covered by `tests/unit/log.test.ts`.
+
+**2. Fixed — Prod served mock questions despite `LLM_PROVIDER=gemini` (root cause: quoted env):**
+
+- `/api/quiz` returned `provider: "mock"`, meaning `getLLMProvider()` never selected Gemini.
+  Root cause: dashboards (Vercel) store env vars as **raw strings**, so a value entered as
+  `"gemini"` arrives with literal quotes and never matches `=== "gemini"`. `.env.local` works
+  because dotenv strips the quotes.
+- **Fix (`src/lib/llm/index.ts`):** added `cleanEnv()` (trim + strip one pair of wrapping quotes),
+  applied to `LLM_PROVIDER`, the Gemini/Ollama keys, model and timeout envs, so the configured
+  provider is honoured regardless of quoting. Covered by `tests/unit/llm-factory.test.ts`.
+- **Added `GET /api/health`:** non-secret runtime diagnostics (resolved provider, raw-encoded
+  `LLM_PROVIDER` shape, key presence + length, Supabase config) to diagnose such misconfig in prod
+  without exposing credentials. **Verified live: provider now resolves to `gemini` and real
+  questions are served for both authenticated and unauthenticated users.**
+
+**3. Investigated — "provider switches to mock after signing in":**
+
+- Traced both flows (API route, quiz page server component, middleware, user-mastery queries,
+  provider factory, fallback). **Provider selection takes zero auth input** — `getLLMProvider()`
+  reads only env; no BYOK/preferences/tier logic exists; authed and anon users send Gemini an
+  identical request. The only auth-correlated route to mock is the route's **fallback path** firing
+  when the Gemini call itself throws (`provider: "mock-fallback"`, `fallback: true`), distinct from
+  the env case (`provider: "mock"`). The structured WARN log surfaces the exact failure reason.
+- Locked in correct behaviour with `tests/integration/quiz-provider-flows.test.ts` (PR #23): authed
+  (with history) and new/anon (diagnostic) flows both resolve `gemini` when configured; mock and
+  mock-fallback behaviours preserved.
+
+**Current Status:**
+
+- All 211 unit/integration tests passing; `tsc --noEmit`, ESLint, Prettier, build green. LLM
+  generation confirmed working in production (Gemini) for signed-in and anonymous users.
+
+**Next recommended action:** merge PR #23; optionally add 429-aware retry/backoff to the Gemini
+provider so transient free-tier rate limits don't surface as mock fallback.
+
+---
+
 ## 2026-10-30 — Phase 7 (Dashboard v2), Phase 8 (Auth audit & RLS), CI Playwright fixes, LLM generation hardening
 
 Full-stack consolidation session on branch **`feat/ollama-provider`**. All 191 unit/integration tests passing; TypeScript (`tsc --noEmit`), ESLint, and Playwright e2e suites all passing cleanly.
