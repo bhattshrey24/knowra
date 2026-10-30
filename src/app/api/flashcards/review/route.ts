@@ -6,8 +6,11 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { retentionOutcome, scheduleNext, type SchedulingState } from "@/lib/learning/sm2";
 import { foldConceptMastery } from "@/lib/learning/aggregate";
 import { INITIAL_MASTERY, type MasteryState } from "@/lib/learning/mastery";
+import { createLogger, errorContext } from "@/lib/log";
 
 export const runtime = "nodejs";
+
+const log = createLogger("api/flashcards/review");
 
 const bodySchema = z.object({
   cardId: z.string().uuid(),
@@ -74,6 +77,10 @@ export async function POST(req: Request): Promise<Response> {
     if (!updatedCard || updatedCard.length === 0) {
       // In case migration 0011 hasn't been executed on the hosted database yet,
       // fallback to the admin client with strict user ownership validation.
+      log.warn("RLS update returned no rows, using admin fallback (migration 0011 missing?)", {
+        userId: user.id,
+        cardId,
+      });
       const admin = createAdminClient();
       await admin.from("flashcards").update(updatePayload).eq("id", cardId).eq("user_id", user.id);
     }
@@ -107,7 +114,8 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     return NextResponse.json({ updated: true, dueAt, intervalDays: next.intervalDays });
-  } catch {
+  } catch (err) {
+    log.error("review scheduling failed", { cardId, grade, ...errorContext(err) });
     return NextResponse.json({ updated: false, reason: "error" }, { status: 500 });
   }
 }

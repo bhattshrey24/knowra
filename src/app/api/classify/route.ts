@@ -5,8 +5,11 @@ import { MockLLMProvider } from "@/lib/llm/mock";
 import { getTaxonomy } from "@/lib/db/taxonomy-server";
 import { resolveClassification } from "@/lib/learning/classify";
 import { rateLimit } from "@/lib/rate-limit";
+import { createLogger, errorContext } from "@/lib/log";
 
 export const runtime = "nodejs";
+
+const log = createLogger("api/classify");
 
 const bodySchema = z.object({ query: z.string().min(2).max(100) });
 
@@ -44,7 +47,10 @@ export async function POST(req: Request): Promise<Response> {
   try {
     proposed = await provider.classify({ query, subjects });
   } catch (err) {
-    console.error(`[classify] failed (provider=${provider.id}):`, (err as Error)?.message);
+    log.warn("classify failed, using mock fallback", {
+      provider: provider.id,
+      ...errorContext(err),
+    });
     proposed = await new MockLLMProvider().classify({ query, subjects });
   }
 

@@ -4,7 +4,10 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { buildTaxonomy, type Taxonomy, type TaxonomyInput } from "@/lib/learning/taxonomy";
 import { SEED_TAXONOMY } from "@/lib/taxonomy/seed";
 import { rowsToTaxonomy, taxonomyToRows, type TaxonomyRows } from "@/lib/taxonomy/rows";
+import { createLogger, errorContext } from "@/lib/log";
 import type { ResolvedClassification } from "@/lib/learning/classify";
+
+const log = createLogger("db/taxonomy");
 
 /**
  * Data access for the shared taxonomy (Phase 6.1). Reads and writes use the
@@ -131,7 +134,7 @@ export async function getTaxonomy(): Promise<Taxonomy> {
     const fromDb = await fetchTaxonomyFromDb();
     if (fromDb) return buildTaxonomy(fromDb);
   } catch (err) {
-    console.error("[taxonomy] DB read failed, using seed:", (err as Error)?.message);
+    log.warn("DB read failed, falling back to in-memory seed", errorContext(err));
   }
   return buildTaxonomy(SEED_TAXONOMY);
 }

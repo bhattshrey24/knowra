@@ -5,8 +5,11 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { getTaxonomy, saveClassification } from "@/lib/db/taxonomy-server";
 import { resolveClassification } from "@/lib/learning/classify";
 import { rateLimit } from "@/lib/rate-limit";
+import { createLogger, errorContext } from "@/lib/log";
 
 export const runtime = "nodejs";
+
+const log = createLogger("api/learn");
 
 const bodySchema = z.object({
   subject: z.string().min(1).max(100),
@@ -52,9 +55,10 @@ export async function POST(req: Request): Promise<Response> {
     const tax = await getTaxonomy();
     const resolved = resolveClassification(parsed.data, tax);
     const ids = await saveClassification(resolved);
+    log.info("classification saved", { conceptId: ids.conceptId, topicId: ids.topicId });
     return NextResponse.json(ids);
   } catch (err) {
-    console.error("[learn] save failed:", (err as Error)?.message);
+    log.error("save failed", errorContext(err));
     return NextResponse.json({ error: "Could not save" }, { status: 500 });
   }
 }
