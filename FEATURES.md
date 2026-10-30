@@ -157,6 +157,16 @@ MVP feature not started is the AI assistant (#5). Each sub-item below has its ow
   topic/subject insight is derived via `aggregateByLevel`; the min-evidence gate means no concept
   is called weak/mastered from a single response. Live verification needs accumulated history._
 
+- ✅ **6.8 AI study-plan advisor (guardrailed):** Turn the deterministic knowledge profile into a
+  readable "what to do next" plan. The engine selects the focus concepts and _why_
+  (`buildStudyFocus`: due-for-review first, then weak → unassessed → retention) and the LLM only
+  phrases/orders them via `LLMProvider.generateStudyPlan`. Guardrails: the model may reference
+  **only** the engine-selected concepts (validated by `parseStudyPlan`, which also uses our
+  authoritative concept names, not the model's), and any LLM failure falls back to a deterministic
+  templated plan (`fallbackStudyPlan`) — so `POST /api/study-plan` never dead-ends. Surfaced on the
+  quiz setup page (`StudyPlanCard`). _Covered by `tests/unit/study-plan{,-validation}.test.ts` +
+  `tests/integration/study-plan-api.test.ts`._
+
 - 🟨 **6.x Homepage & catalogue (supports 6.2/6.3):** Redesigned `/home` around the taxonomy — a
   prominent search bar ("Search any subject, topic or concept…") with "Try:" examples and live
   closest-match suggestions (`taxonomy/catalogue.ts`, unit-tested ranking); an Explore-the-catalogue
