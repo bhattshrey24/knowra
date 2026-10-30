@@ -5,6 +5,46 @@ Newest first.
 
 ---
 
+## 2026-10-30 — Curated sample question bank + LLM-first quiz flow with graceful fallback
+
+Branch **`feat/ollama-provider`**. Replaced the generic `MockLLMProvider` quiz fallback with a
+real curated bank, and made the "no content + no LLM" case an explicit, honest stop.
+
+**Behaviour (per product spec):**
+
+- Quizzing is **LLM-first** (fresh, personalized from the learner's strengths/weaknesses/difficulty
+  as before).
+- **LLM fails/times out for covered content →** serve curated questions for the requested _scope_
+  (subject/topic/concept), flagged in the UI ("curated practice questions"). Never mock
+  placeholders.
+- **LLM unavailable AND no curated coverage (e.g. custom topic) →** `503 {reason:"unavailable"}`;
+  the UI shows "Question generation is temporarily unavailable. Please try again." Never shows
+  unrelated samples.
+- Existing **mock** provider (dev/no-key default) and normal generation path unchanged.
+
+**Implementation:**
+
+- `src/lib/learning/question-bank-data.ts` — hand-authored, correct MCQs keyed to real taxonomy
+  concepts across Mathematics, Science, Computer Science (representative coverage; other concepts
+  are LLM-only).
+- `src/lib/learning/question-bank.ts` — deterministic, LLM-independent selector (`curatedQuiz`,
+  `hasCurated`): returns curated questions for exactly the requested concepts, prefers the chosen
+  difficulty (widening only when needed), round-robins across concepts, respects format.
+- `src/app/api/quiz/route.ts` — `conceptsForQuiz` now also returns the full scope concept ids so the
+  fallback can draw from anywhere in the scope, not just the LLM-selected subset. Catch path: curated
+  → else 503. `provider` is reported as `"curated"` with `fallback: true`.
+- `src/components/quiz-session.tsx` — surfaces the 503 message in the error state; fallback notice
+  reworded to reflect curated questions.
+
+**Tests:** `tests/unit/question-bank.test.ts` (data integrity + selector), `tests/integration/
+quiz-curated-fallback.test.ts` (curated fallback + 503). Updated `quiz-provider-flows.test.ts` for
+the new curated contract. All 225 unit/integration tests pass; typecheck, lint, Prettier, build green.
+
+**Follow-up:** curated coverage is partial by design — extend the bank to more subjects as needed;
+consider loading it into the DB if curated content should be user-expandable.
+
+---
+
 ## 2026-10-30 — Structured logging, LLM provider misconfig fix (prod serving mock), provider-flow investigation
 
 Session on branch **`feat/ollama-provider`** (PRs #22 merged, #23 open). Observability plus a

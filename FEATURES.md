@@ -121,6 +121,14 @@ MVP feature not started is the AI assistant (#5). Each sub-item below has its ow
   STEM, humanities, arts, social science, business and more (`taxonomy/seed.ts`, derived from
   `DOMAINS` so every subject is quizzable). Loading into the DB still needs migration `0007`
   applied + `POST /api/admin/seed-taxonomy`; until then `getTaxonomy()` serves this seed._
+- 🟨 **6.4a Curated sample question bank (fallback):** A hand-authored, LLM-independent bank of
+  correct questions keyed to real concepts (`src/lib/learning/question-bank{,-data}.ts`), covering a
+  representative set across Mathematics, Science, and Computer Science. Quizzing is **LLM-first**;
+  if generation fails or times out for covered content, the quiz route serves curated questions for
+  the requested scope (flagged in the UI). If the LLM is unavailable **and** the content has no
+  curated coverage (e.g. a custom topic), the route returns `503 {reason:"unavailable"}` and the UI
+  says generation is temporarily unavailable — it never shows unrelated samples. _Covered by
+  `tests/unit/question-bank.test.ts` + `tests/integration/quiz-curated-fallback.test.ts`._
 - 🟨 **6.5 Adaptive diagnostics:** When a user picks an area with insufficient history, offer a
   short adaptive diagnostic to estimate concept-level mastery. Users may skip and start learning;
   mastery stays **uncertain** until there's enough evidence. Reuse reliable existing performance
