@@ -42,9 +42,7 @@ describe("parseLlmMcqs (untrusted LLM output)", () => {
     ).toBe(false);
 
     // Option with raw JSON delimiter artifact
-    expect(
-      parseLlmMcqs([{ ...validRaw[0], options: ["3", "4", "5", "],"] }]).success,
-    ).toBe(false);
+    expect(parseLlmMcqs([{ ...validRaw[0], options: ["3", "4", "5", "],"] }]).success).toBe(false);
 
     // Option leaking schema / internal fields
     expect(
