@@ -19,7 +19,7 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 - ✅ Interactive quiz UI: difficulty 1–5 → generated MCQs → per-question feedback → score
 - ✅ Verified: 26 unit/integration tests + 4 e2e (full quiz loop) passing
 
-## Phase 2 — Learning engine + persistence 🟨
+## Phase 2 — Learning engine + persistence ✅
 
 - ✅ Supabase connected; migrations `0001` (profiles) + `0002` (quiz_attempts, attempt_answers,
   domain_mastery, flashcards) with RLS on every table
@@ -32,7 +32,7 @@ Status legend: ⬜ not started · 🟨 partial (phased) · ✅ done (acceptance 
 - ✅ Live: all migrations `0001`–`0009` applied and Anonymous sign-ins enabled (2026-10-29). The
   DB-backed flow (attempts → mastery → flashcards → concept mastery) runs end-to-end.
 
-## Phase 3 — Spaced repetition & analytics 🟨
+## Phase 3 — Spaced repetition & analytics ✅
 
 - ✅ Deterministic **SM-2** scheduling engine (`sm2.ts`) — unit-tested
 - ✅ Migration `0003`: scheduling columns on flashcards (reps, ease, interval, due_at)
