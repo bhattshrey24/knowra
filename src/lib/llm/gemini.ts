@@ -18,11 +18,14 @@ import type {
   GenerateStudyPlanInput,
   GradeWrittenResult,
   LLMProvider,
+  TutorReplyInput,
 } from "@/lib/llm/provider";
 import type { StudyPlan } from "@/types/learning";
 import { parseClassified } from "@/lib/validation/classify";
 import { parseStudyPlan } from "@/lib/validation/study-plan";
+import { parseTutorReply } from "@/lib/validation/tutor";
 import { buildStudyPlanPrompt } from "@/lib/llm/study-plan-prompt";
+import { buildTutorPrompt } from "@/lib/llm/tutor-prompt";
 import {
   parseLlmMcqs,
   parseLlmMulti,
@@ -179,6 +182,14 @@ export class GeminiProvider implements LLMProvider {
     const raw = await this.generateJson(prompt, STUDY_PLAN_RESPONSE_SCHEMA);
     const parsed = parseStudyPlan(raw, allowedById);
     if (!parsed.success) throw new Error(`Gemini returned invalid study plan: ${parsed.error}`);
+    return parsed.data;
+  }
+
+  async tutorReply(input: TutorReplyInput): Promise<string> {
+    const { system, prompt } = buildTutorPrompt(input);
+    const text = await this.generateText(`${system}\n\n${prompt}`);
+    const parsed = parseTutorReply(text);
+    if (!parsed.success) throw new Error(`Gemini returned an invalid tutor reply: ${parsed.error}`);
     return parsed.data;
   }
 

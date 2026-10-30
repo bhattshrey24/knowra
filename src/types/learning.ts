@@ -147,3 +147,43 @@ export interface StudyPlan {
   steps: StudyStep[];
   encouragement?: string;
 }
+
+/**
+ * Learner profile types (AI assistant / chatbot). As with the study plan, the
+ * engine *observes and measures* — which concepts are weak, how the learner
+ * likes to engage — and the LLM only phrases answers grounded in those facts.
+ */
+
+/**
+ * How the learner prefers to receive help, derived deterministically from their
+ * own history (never guessed by an LLM). The tutor is instructed to answer *in*
+ * this style; the engine decides what the style is.
+ */
+export interface LearningStyle {
+  /** The question format the learner engages with most. */
+  preferredFormat: QuestionFormat;
+  /** Whether replies should be brief or fuller. */
+  verbosity: "concise" | "detailed";
+  /** Typical working difficulty, 1..5. */
+  level: Difficulty;
+  /** The learner engages with cross-domain analogy cards. */
+  likesAnalogies: boolean;
+  /** 0..1 confidence in this profile; grows with history. */
+  confidence: number;
+}
+
+/**
+ * A compact, deterministic snapshot of the learner that the AI tutor may
+ * reference. Every fact here is produced by the engine/DB — the LLM only
+ * phrases answers grounded in it, and never measures or invents any of it.
+ */
+export interface LearnerContext {
+  displayName?: string;
+  style: LearningStyle;
+  /** Concepts the engine has flagged for attention, with the reason. */
+  focus: StudyFocusItem[];
+  /** Subjects the learner has engaged, for grounding. */
+  subjects: string[];
+  /** How many concepts have any mastery evidence yet. */
+  assessedConcepts: number;
+}

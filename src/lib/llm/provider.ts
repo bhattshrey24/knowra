@@ -14,6 +14,7 @@ import type {
   Concept,
   Difficulty,
   Flashcard,
+  LearnerContext,
   Question,
   QuestionFormat,
   StudyFocusItem,
@@ -101,6 +102,25 @@ export interface GenerateStudyPlanInput {
   focus: StudyFocusItem[];
 }
 
+/** One turn in an assistant conversation. */
+export interface TutorMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface TutorReplyInput {
+  /** The learner's latest message. Untrusted input. */
+  message: string;
+  /** Prior turns, for continuity. The caller bounds the length. */
+  history: TutorMessage[];
+  /**
+   * The engine-built, authoritative snapshot of the learner. The model grounds
+   * its reply in these facts and answers in the derived learning style; it must
+   * not measure or invent anything beyond them.
+   */
+  context: LearnerContext;
+}
+
 /**
  * The contract every LLM backend implements. Returned content is always
  * schema-validated by the caller (zod) before it is stored or rendered —
@@ -120,4 +140,11 @@ export interface LLMProvider {
    * and the caller validates + guardrails the result.
    */
   generateStudyPlan(input: GenerateStudyPlanInput): Promise<StudyPlan>;
+  /**
+   * Answer a learner's question as a profile-aware tutor. The engine supplies an
+   * authoritative snapshot (`context`) and the derived learning style; the model
+   * only phrases a grounded reply in that style. Plain text out; the caller
+   * bounds and sanitises it.
+   */
+  tutorReply(input: TutorReplyInput): Promise<string>;
 }
