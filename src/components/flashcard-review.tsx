@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, RotateCw } from "lucide-react";
+import { ArrowLeft, Loader2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -54,7 +54,9 @@ export function FlashcardReview({
   const router = useRouter();
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  // The grade currently being saved (drives the per-button processing state).
+  const [pending, setPending] = useState<ReviewGrade | null>(null);
+  const submitting = pending !== null;
 
   const total = cards.length;
   const card = cards[index];
@@ -83,7 +85,7 @@ export function FlashcardReview({
 
   async function grade(g: ReviewGrade) {
     if (!card || submitting) return;
-    setSubmitting(true);
+    setPending(g);
     try {
       await fetch("/api/flashcards/review", {
         method: "POST",
@@ -93,7 +95,7 @@ export function FlashcardReview({
     } catch {
       // best-effort: keep the session moving even without a backend
     }
-    setSubmitting(false);
+    setPending(null);
     setFlipped(false);
     setIndex((i) => i + 1);
   }
@@ -193,18 +195,28 @@ export function FlashcardReview({
 
         {flipped ? (
           <div className="space-y-3">
-            <p className="text-center text-sm font-medium">How well did you remember?</p>
+            <p className="text-center text-sm font-medium">
+              {submitting ? "Saving…" : "How well did you remember?"}
+            </p>
             <div className="grid grid-cols-4 gap-2">
               {GRADES.map(({ grade: g, label, sub, className }) => (
                 <button
                   key={g}
                   type="button"
                   disabled={submitting}
+                  aria-busy={pending === g}
                   onClick={() => grade(g)}
-                  className="hover:border-primary/40 flex flex-col items-center gap-0.5 rounded-lg border px-2 py-3 transition-colors disabled:opacity-60"
+                  className={cn(
+                    "hover:border-primary/40 flex flex-col items-center gap-0.5 rounded-lg border px-2 py-3 transition-colors",
+                    pending === g ? "border-primary bg-primary/5" : "disabled:opacity-50",
+                  )}
                 >
                   <span className={cn("text-sm font-semibold", className)}>{label}</span>
-                  <span className="text-muted-foreground text-xs">{sub}</span>
+                  {pending === g ? (
+                    <Loader2 className="text-muted-foreground size-3.5 animate-spin" />
+                  ) : (
+                    <span className="text-muted-foreground text-xs">{sub}</span>
+                  )}
                 </button>
               ))}
             </div>

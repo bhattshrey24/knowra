@@ -17,8 +17,10 @@ import type {
   GradeWrittenInput,
   GradeWrittenResult,
   LLMProvider,
+  TutorReplyInput,
 } from "@/lib/llm/provider";
 import { fallbackStudyPlan } from "@/lib/learning/study-plan";
+import { fallbackReply } from "@/lib/learning/tutor-context";
 import type { StudyPlan } from "@/types/learning";
 
 export class MockLLMProvider implements LLMProvider {
@@ -120,5 +122,10 @@ export class MockLLMProvider implements LLMProvider {
   async generateStudyPlan(input: GenerateStudyPlanInput): Promise<StudyPlan> {
     // Deterministic: the engine's own templated plan, so dev/tests are stable.
     return fallbackStudyPlan(input.subjectName, input.focus);
+  }
+
+  async tutorReply(input: TutorReplyInput): Promise<string> {
+    // Deterministic: the engine's own grounded reply, so dev/tests are stable.
+    return fallbackReply(input.message, input.context);
   }
 }

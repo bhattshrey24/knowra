@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Layers, BarChart3 } from "lucide-react";
+import { Home, Layers, BarChart3, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ProfileMenu } from "@/components/profile-menu";
@@ -11,6 +11,7 @@ const links = [
   { href: "/home", label: "Home", icon: Home },
   { href: "/flashcards", label: "Flashcards", icon: Layers },
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
+  { href: "/assistant", label: "Assistant", icon: Bot },
 ];
 
 export function AppNav() {
@@ -29,6 +30,7 @@ export function AppNav() {
               <Link
                 key={href}
                 href={href}
+                aria-label={label}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogIn, LogOut, User } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/button-link";
 import { createClient } from "@/lib/db/client";
 import { isSupabaseConfigured } from "@/lib/env";
 
@@ -96,15 +96,15 @@ export function ProfileMenu() {
   // If anonymous (or no session), show simple Sign in / Sync button
   if (isAnonymous) {
     return (
-      <Button
+      <ButtonLink
         variant="ghost"
         size="sm"
         className="text-muted-foreground hover:text-foreground gap-1.5 text-xs"
-        render={<Link href="/login" />}
+        href="/login"
       >
         <LogIn className="size-3.5" />
         <span className="hidden sm:inline">Sign in</span>
-      </Button>
+      </ButtonLink>
     );
   }
 

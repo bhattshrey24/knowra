@@ -20,11 +20,14 @@ import type {
   GenerateStudyPlanInput,
   GradeWrittenResult,
   LLMProvider,
+  TutorReplyInput,
 } from "@/lib/llm/provider";
 import type { StudyPlan } from "@/types/learning";
 import { parseClassified } from "@/lib/validation/classify";
 import { parseStudyPlan } from "@/lib/validation/study-plan";
+import { parseTutorReply } from "@/lib/validation/tutor";
 import { buildStudyPlanPrompt } from "@/lib/llm/study-plan-prompt";
+import { buildTutorPrompt } from "@/lib/llm/tutor-prompt";
 import {
   parseLlmMcqs,
   parseLlmMulti,
@@ -190,6 +193,14 @@ export class OllamaProvider implements LLMProvider {
     return parsed.data;
   }
 
+  async tutorReply(input: TutorReplyInput): Promise<string> {
+    const { system, prompt } = buildTutorPrompt(input);
+    const text = await this.chatText(prompt, system);
+    const parsed = parseTutorReply(text);
+    if (!parsed.success) throw new Error(`Ollama returned an invalid tutor reply: ${parsed.error}`);
+    return parsed.data;
+  }
+
   async gradeWritten(): Promise<GradeWrittenResult> {
     // The deterministic engine (grade-written.ts) grades written answers today.
     throw new Error("OllamaProvider.gradeWritten is not used; deterministic grader handles it");
@@ -223,11 +234,17 @@ export class OllamaProvider implements LLMProvider {
     return content;
   }
 
-  private async chatText(prompt: string): Promise<string> {
+  private async chatText(prompt: string, systemPrompt?: string): Promise<string> {
+    const messages = systemPrompt
+      ? [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt },
+        ]
+      : [{ role: "user", content: prompt }];
     const res = await this.post(
       JSON.stringify({
         model: this.model,
-        messages: [{ role: "user", content: prompt }],
+        messages,
         stream: false,
         // Keep the model resident so the next request isn't a cold start.
         keep_alive: "10m",

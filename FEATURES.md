@@ -167,6 +167,20 @@ MVP feature not started is the AI assistant (#5). Each sub-item below has its ow
   quiz setup page (`StudyPlanCard`). _Covered by `tests/unit/study-plan{,-validation}.test.ts` +
   `tests/integration/study-plan-api.test.ts`._
 
+- ✅ **#5 AI learning assistant (chatbot):** A profile-aware tutor at `/assistant`. The engine
+  _observes and measures_; the LLM only phrases. `deriveLearningStyle`
+  (`src/lib/learning/learning-style.ts`) derives how the learner engages (preferred format,
+  verbosity, working difficulty, analogy affinity) from their own history, and
+  `gatherLearnerContext` (`src/lib/db/learner-profile-server.ts`) assembles an authoritative
+  snapshot (weak/unassessed/due focus via `buildStudyFocus`, subjects, display name). The LLM
+  answers via `LLMProvider.tutorReply`, instructed to use **only** the supplied facts and to reply
+  in the derived style (`buildTutorPrompt`). Guardrails: request + reply validated/bounded
+  (`src/lib/validation/tutor.ts`), reply rendered as plain text, prompt-injection resisted, and any
+  LLM failure (or no key) falls back to a deterministic grounded reply (`fallbackReply`) so the
+  assistant never dead-ends. Conversation history is client-side only (ephemeral). _Covered by
+  `tests/unit/learning-style.test.ts`, `tests/unit/tutor-context.test.ts`,
+  `tests/integration/chat-api.test.ts`, `tests/e2e/assistant.spec.ts`._
+
 - 🟨 **6.x Homepage & catalogue (supports 6.2/6.3):** Redesigned `/home` around the taxonomy — a
   prominent search bar ("Search any subject, topic or concept…") with "Try:" examples and live
   closest-match suggestions (`taxonomy/catalogue.ts`, unit-tested ranking); an Explore-the-catalogue
@@ -255,7 +269,7 @@ the engine/analytics need) → heavy user ≈ 100 KB → **~5,000 heavy / 10,000
 | 2   | Custom topic search                   | 4 / 6     | ✅     | Search subjects/topics/concepts; no match → LLM search-create (6.3) classifies into taxonomy.       |
 | 3   | Adjustable difficulty 1–5 + recommend | 1 / 4 / 6 | ✅     | Adaptive-by-default (6.6) from mastery + recent perf; consistent level guidelines; manual override. |
 | 4   | Weakness detection + flashcards       | 2 / 6     | ✅     | Weakness/foundational/connection cards, concept-tagged; weakest-first revision.                     |
-| 5   | AI learning assistant (chatbot)       | 6         | ⬜     | **Not started** — the one remaining MVP feature. Scoped to user's profile/mistakes.                 |
+| 5   | AI learning assistant (chatbot)       | 6         | ✅     | Profile-aware tutor at `/assistant`; engine measures + derives learning style, LLM phrases only.    |
 | 6   | Spaced repetition + reminders         | 3 / 6     | ✅     | Unified flip-and-rate review (SM-2); retention folds into concept mastery (6.7). Reminders later.   |
 | 7   | 80/20 prioritization                  | 4 / 6     | ✅     | Dashboard focus areas + concept-level balanced selection (weak/unassessed/retention) (6.2).         |
 | 8   | Holistic knowledge profile            | 2 / 6     | ✅     | Subject + concept→topic rollups + weakest concepts + uncertainty on dashboard (6.1/6.2).            |
@@ -276,7 +290,8 @@ the engine/analytics need) → heavy user ≈ 100 KB → **~5,000 heavy / 10,000
     schema constraints, system prompt instructions, and defensive Zod validation filters against JSON/prompt leakage.
   - Gemini: Supported natively (`LLM_PROVIDER=gemini`) via Google AI Studio (`gemini-flash-lite-latest` or `gemini-2.0-flash`).
 - **CI / Tests:** All 191 unit & integration tests passing; Playwright e2e suites passing on GitHub Actions.
-- **Still to do:** **Feature #5: AI learning assistant (chatbot)** — the single remaining MVP feature.
+- **MVP features complete:** all 11 core MVP features (#1–#11) are now done; #12–#14 remain partial
+  by design (see table). Feature #5 (AI learning assistant) landed on `feat/ai-assistant`.
 - **Known limitation:** answers are also scored client-side for instant feedback, but `/api/attempts`
   **re-scores server-side** from the reference/answer key before persisting — so stored mastery is
   trustworthy. Tracked in `improve.md`.

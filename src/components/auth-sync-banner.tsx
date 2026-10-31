@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { ArrowRight, Sparkles, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/button-link";
 import { createClient } from "@/lib/db/client";
 import { isSupabaseConfigured } from "@/lib/env";
 
@@ -43,10 +42,10 @@ export function AuthSyncBanner() {
       </div>
 
       <div className="flex items-center gap-2">
-        <Button size="sm" variant="default" className="h-7 text-xs" render={<Link href="/login" />}>
+        <ButtonLink size="sm" variant="default" className="h-7 text-xs" href="/login">
           Save progress
           <ArrowRight className="ml-1 size-3" />
-        </Button>
+        </ButtonLink>
         <button
           type="button"
           onClick={handleDismiss}

@@ -5,6 +5,48 @@ Newest first.
 
 ---
 
+## 2026-10-30 — AI learning assistant / chatbot (#5), profile-aware, engine measures
+
+Branch **`feat/ai-assistant`**. The final MVP feature: a chat tutor at `/assistant` that answers a
+learner's questions grounded in their knowledge profile and in the style they learn best — without
+breaking the golden rule (the LLM never measures or decides anything).
+
+**Design — who does what:**
+
+- **Engine observes and measures.** `deriveLearningStyle` (`src/lib/learning/learning-style.ts`)
+  derives the learner's style deterministically from their own history: preferred question format,
+  verbosity (written-leaning / long answers → detailed), typical working difficulty, and analogy
+  affinity (from connection-flashcard engagement). `gatherLearnerContext`
+  (`src/lib/db/learner-profile-server.ts`) assembles the authoritative snapshot — focus concepts via
+  the reused `buildStudyFocus` (due → weak → unassessed), subjects, display name.
+- **LLM only phrases.** `LLMProvider.tutorReply` (mock/gemini/ollama) answers using **only** the
+  supplied facts and in the derived style (`buildTutorPrompt`). The mock returns the deterministic
+  `fallbackReply`, so dev/tests are stable.
+
+**Guardrails:**
+
+- Request + reply validated/bounded with zod (`src/lib/validation/tutor.ts`); reply rendered as
+  plain text (no HTML). The system prompt forbids inventing concepts/scores, keeps the tutor in
+  study scope, and treats the user message as a question, not instructions (prompt-injection).
+- Any LLM failure (or no key configured) falls back to `fallbackReply` — a grounded, intent-aware
+  answer built from the same engine facts — so `POST /api/chat` never dead-ends.
+
+**Scope:** conversation history is client-side only (ephemeral, sent with each request); no new
+migration. Persistence + learning-style-from-chat-feedback are a clean future phase. **No RAG** —
+the profile is small and structured (SQL retrieval, not vector search); pgvector stays available if
+a content corpus or large mistake history ever justifies it.
+
+**Surfaced:** `/assistant` page + nav entry; `ChatAssistant` component with starter suggestions, a
+thinking state, and a "coaching unavailable" note when the reply is deterministic.
+
+**Tests:** `tests/unit/learning-style.test.ts`, `tests/unit/tutor-context.test.ts`,
+`tests/integration/chat-api.test.ts` (mock, LLM success, LLM-failure → fallback, 400s),
+`tests/e2e/assistant.spec.ts`. All **268** unit/integration tests pass; typecheck, lint, build
+green. Live-verified against the real Gemini provider: an empty profile correctly yields "take a
+quiz" guidance rather than invented weaknesses.
+
+---
+
 ## 2026-10-30 — AI study-plan advisor (guardrailed; engine decides, LLM phrases)
 
 Branch **`feat/ai-study-plan`**. Added an AI "what to do next" advisor that sits _on top of_ the
