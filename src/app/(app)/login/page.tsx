@@ -9,6 +9,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/db/client";
 import { isSupabaseConfigured } from "@/lib/env";
 
+/** Friendly, consistent message when the email is already registered. */
+const EMAIL_TAKEN_MESSAGE =
+  "An account with this email already exists. Please sign in instead, or use a different email.";
+
+/** Supabase phrases the duplicate-email error a few ways across sign-up/update. */
+function isDuplicateEmail(message: string): boolean {
+  return /already (been )?registered|already in use|already exists|email[_\s-]?exists/i.test(
+    message,
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"signin" | "signup">("signup");
@@ -108,40 +119,51 @@ export default function LoginPage() {
 
     try {
       if (mode === "signup") {
-        // Register or upgrade account via server API ($0 rate-limit bypass with auto-confirm)
-        const res = await fetch("/api/auth/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        // Email ownership must be verified: Supabase emails a confirmation link
+        // and the account stays inactive until it's clicked — so we never sign
+        // the user in here. Everyone starts as an anonymous guest (see
+        // AuthBootstrap), so the common case upgrades that guest in place
+        // (preserving their quiz history); a rare non-anonymous visitor signs up
+        // fresh. Duplicate emails are surfaced clearly.
+        const emailRedirectTo = `${window.location.origin}/auth/callback?next=/dashboard`;
+        const metadata = { display_name: displayName.trim() || email.split("@")[0] };
+
+        const {
+          data: { user: currentUser },
+        } = await supabase.auth.getUser();
+
+        if (currentUser?.is_anonymous) {
+          const { error: upgradeErr } = await supabase.auth.updateUser(
+            { email, password, data: metadata },
+            { emailRedirectTo },
+          );
+          if (upgradeErr) {
+            setError(
+              isDuplicateEmail(upgradeErr.message) ? EMAIL_TAKEN_MESSAGE : upgradeErr.message,
+            );
+            return;
+          }
+        } else {
+          const { data, error: signUpErr } = await supabase.auth.signUp({
             email,
             password,
-            displayName: displayName.trim() || undefined,
-          }),
-        });
-
-        const result = await res.json();
-        if (!res.ok) {
-          throw new Error(result.error || "Failed to create account");
+            options: { emailRedirectTo, data: metadata },
+          });
+          if (signUpErr) {
+            setError(isDuplicateEmail(signUpErr.message) ? EMAIL_TAKEN_MESSAGE : signUpErr.message);
+            return;
+          }
+          // Supabase hides duplicates on sign-up by returning a user with no
+          // linked identities — treat that as "already registered".
+          if (data.user && (data.user.identities?.length ?? 0) === 0) {
+            setError(EMAIL_TAKEN_MESSAGE);
+            return;
+          }
         }
 
-        // Establish the browser session immediately
-        const { error: loginErr } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (loginErr) throw loginErr;
-
         setSuccess(
-          result.upgraded
-            ? "Account created successfully! Your previous quiz history has been preserved."
-            : "Account created successfully! Welcome to Knowra.",
+          `Almost there — we've emailed a confirmation link to ${email}. Click it to activate your account, then sign in.`,
         );
-
-        setTimeout(() => {
-          router.push("/dashboard");
-          router.refresh();
-        }, 800);
       } else {
         // Sign in with existing credentials
         const { data, error: loginErr } = await supabase.auth.signInWithPassword({
